@@ -1,0 +1,2930 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ParkFlow — Smart Parking Management System</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <!-- Google Fonts Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom subtle scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .parking-slot-card {
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .parking-slot-card:hover {
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body class="h-full font-sans text-slate-800 antialiased flex flex-col min-h-screen bg-slate-50 select-none">
+
+  <!-- ROOT CONTAINER -->
+  <div id="app" class="flex-1 flex flex-col">
+    <!-- Content injected dynamically via JavaScript -->
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+  <!-- NOTIFICATION DRAWER / TRAY -->
+  <div id="notification-drawer" class="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out border-l border-slate-200 flex flex-col">
+    <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-bell text-brand-600"></i>
+        <h3 class="font-bold text-slate-800 text-lg">System Notifications</h3>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="clearAllNotifications()" class="text-xs text-slate-500 hover:text-slate-800 font-medium px-2 py-1 rounded hover:bg-slate-200 transition">Clear All</button>
+        <button onclick="toggleNotificationDrawer()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+    </div>
+    <div id="notification-list" class="flex-1 overflow-y-auto p-4 space-y-3">
+      <!-- Injected notifications -->
+    </div>
+    <div class="p-3 border-t border-slate-100 bg-slate-50 text-center text-xs text-slate-400">
+      Live Real-Time Activity Log
+    </div>
+  </div>
+  <div id="drawer-backdrop" onclick="toggleNotificationDrawer()" class="fixed inset-0 bg-slate-900/30 backdrop-blur-xs z-40 hidden transition-opacity"></div>
+
+  <!-- BOOKING MODAL -->
+  <div id="booking-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-150">
+      <div class="bg-gradient-to-r from-slate-900 to-slate-800 p-5 text-white flex justify-between items-center">
+        <div>
+          <span id="modal-zone-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">VIP Zone</span>
+          <h3 id="modal-slot-title" class="text-xl font-bold mt-1">Book Slot V-01</h3>
+        </div>
+        <button onclick="closeBookingModal()" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-white/10 transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="booking-form" onsubmit="handleBookingSubmit(event)" class="p-6 space-y-5">
+        <input type="hidden" id="booking-slot-id">
+
+        <!-- Slot Details Summary Card -->
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between">
+          <div>
+            <div class="text-xs text-slate-500 font-medium">Hourly Tariff</div>
+            <div id="modal-slot-rate" class="text-2xl font-black text-slate-900">— <span class="text-xs text-slate-500 font-normal">/ hour</span></div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-slate-500 font-medium">Amenities</div>
+            <div id="modal-slot-features" class="text-xs font-medium text-slate-700 mt-0.5">EV Charging &bull; Wide Bay</div>
+          </div>
+        </div>
+
+        <!-- Vehicle Selection -->
+        <div>
+          <div class="flex justify-between items-center mb-1.5">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-700">Select Vehicle</label>
+            <button type="button" onclick="showQuickAddVehicleModal()" class="text-xs text-brand-600 hover:text-brand-700 font-semibold flex items-center gap-1">
+              <i class="fa-solid fa-plus text-[10px]"></i> Register New
+            </button>
+          </div>
+          <select id="booking-vehicle-select" required class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-800 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition shadow-xs">
+            <!-- Injected options -->
+          </select>
+          <p id="vehicle-warning" class="text-xs text-amber-600 mt-1 hidden"><i class="fa-solid fa-triangle-exclamation mr-1"></i> This vehicle is currently parked in another slot.</p>
+        </div>
+
+        <!-- Time Slot Selection -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Start Time</label>
+            <select id="booking-start-time" onchange="calculateBookingCost()" class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-800 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition shadow-xs">
+              <option value="08:00">08:00 AM</option>
+              <option value="09:00" selected>09:00 AM</option>
+              <option value="10:00">10:00 AM</option>
+              <option value="11:00">11:00 AM</option>
+              <option value="12:00">12:00 PM</option>
+              <option value="13:00">01:00 PM</option>
+              <option value="14:00">02:00 PM</option>
+              <option value="15:00">03:00 PM</option>
+              <option value="16:00">04:00 PM</option>
+              <option value="17:00">05:00 PM</option>
+              <option value="18:00">06:00 PM</option>
+              <option value="19:00">07:00 PM</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Duration</label>
+            <select id="booking-duration" onchange="calculateBookingCost()" class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-800 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition shadow-xs">
+              <option value="1" selected>1 Hour</option>
+              <option value="2">2 Hours</option>
+              <option value="3">3 Hours</option>
+              <option value="4">4 Hours</option>
+              <option value="6">6 Hours</option>
+              <option value="8">8 Hours (Full Day)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Calculated Summary Banner -->
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between text-blue-900">
+          <div>
+            <div class="text-xs uppercase font-bold tracking-wider text-blue-600">Reserved Window</div>
+            <div id="booking-window-display" class="font-bold text-sm text-blue-950 mt-0.5">09:00 AM — 10:00 AM</div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs uppercase font-bold tracking-wider text-blue-600">Total Due</div>
+            <div id="booking-total-cost" class="text-2xl font-black text-blue-950">—</div>
+          </div>
+        </div>
+
+        <!-- Free Cancellation Notice -->
+        <div class="flex items-start gap-2.5 text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-200">
+          <i class="fa-solid fa-clock-rotate-left text-slate-400 mt-0.5"></i>
+          <span>Instant booking confirmed. You may cancel with full credit within a <strong>15-minute grace window</strong> directly from your dashboard.</span>
+        </div>
+
+        <!-- Modal Actions -->
+        <div class="flex gap-3 pt-2">
+          <button type="button" onclick="closeBookingModal()" class="w-1/3 py-2.5 border border-slate-300 rounded-xl text-slate-700 font-semibold text-sm hover:bg-slate-100 transition">
+            Cancel
+          </button>
+          <button type="submit" id="submit-booking-btn" class="w-2/3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-circle-check"></i>
+            Confirm Reservation
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- QUICK ADD VEHICLE MODAL -->
+  <div id="quick-vehicle-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-150">
+      <div class="flex justify-between items-center mb-4">
+        <h4 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-car-side text-brand-600"></i> Register New Vehicle
+        </h4>
+        <button onclick="closeQuickVehicleModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <form onsubmit="handleQuickAddVehicle(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">License Plate Number</label>
+          <input type="text" id="quick-plate" required placeholder="e.g. CA-992-PX" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl uppercase font-mono font-bold text-sm outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Vehicle Type</label>
+          <select id="quick-vtype" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="Sedan">Sedan</option>
+            <option value="SUV">SUV</option>
+            <option value="Electric Vehicle (EV)">Electric Vehicle (EV)</option>
+            <option value="Hatchback">Hatchback</option>
+            <option value="Truck / Van">Truck / Van</option>
+            <option value="Motorcycle">Motorcycle</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Make / Model (Optional)</label>
+          <input type="text" id="quick-vmodel" placeholder="e.g. Tesla Model Y" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div class="flex gap-2 pt-2">
+          <button type="button" onclick="closeQuickVehicleModal()" class="flex-1 py-2 border border-slate-300 rounded-xl font-medium text-sm text-slate-700 hover:bg-slate-100">Cancel</button>
+          <button type="submit" class="flex-1 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-sm">Save Vehicle</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- DIGITAL PARKING PASS / E-TICKET MODAL -->
+  <div id="ticket-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+    <div class="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div id="ticket-content">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- APPLICATION JAVASCRIPT STATE ENGINE -->
+  <script>
+    /**
+     * ParkFlow State & Storage Engine
+     * Production-ready vanilla JavaScript state architecture with localStorage persistence.
+     */
+    const STORAGE_KEY = 'parkflow_system_state_v1';
+
+    // Global Supported Currencies with Real-Time Conversion Multipliers
+    const CURRENCIES = {
+      USD: { code: 'USD', symbol: '$', name: 'US Dollar', flag: '🇺🇸', rate: 1.0, decimals: 2 },
+      INR: { code: 'INR', symbol: '₹', name: 'Indian Rupee', flag: '🇮🇳', rate: 83.0, decimals: 0 },
+      EUR: { code: 'EUR', symbol: '€', name: 'Euro', flag: '🇪🇺', rate: 0.92, decimals: 2 },
+      GBP: { code: 'GBP', symbol: '£', name: 'British Pound', flag: '🇬🇧', rate: 0.79, decimals: 2 },
+      AED: { code: 'AED', symbol: 'AED ', name: 'UAE Dirham', flag: '🇦🇪', rate: 3.67, decimals: 2 }
+    };
+
+    // Initial Default Seed State
+    const defaultState = {
+      portal: 'SELECT', // 'SELECT' | 'USER_AUTH' | 'ADMIN_AUTH' | 'USER_DASHBOARD' | 'ADMIN_DASHBOARD'
+      authMode: 'LOGIN', // 'LOGIN' | 'SIGNUP'
+      currentUser: null, // Active user object if logged in
+      currentAdmin: null, // Active admin object if logged in
+      viewMode: 'grid', // 'grid' | 'detailed'
+      filterZone: 'ALL', // 'ALL' | 'VIP' | 'STANDARD' | 'ECONOMY'
+      filterStatus: 'ALL', // 'ALL' | 'FREE' | 'OCCUPIED'
+      adminFilterStatus: 'ALL', // 'ALL' | 'FREE' | 'OCCUPIED'
+      soundEnabled: true, // Native Web Audio sound synthesis toggle
+      selectedCurrency: 'USD', // 'USD' | 'INR' | 'EUR' | 'GBP' | 'AED'
+      searchQuery: '', // Live bay search query string
+
+      // System Pricing & Capacity Configurations (Dynamic admin scale: 4 to 24 slots)
+      config: {
+        totalSlots: 16,
+        vipRate: 15.00,
+        standardRate: 8.00,
+        economyRate: 4.00,
+        currency: '$'
+      },
+
+      // Registered Accounts
+      users: [
+        {
+          id: 'u-1',
+          username: 'john_doe',
+          fullName: 'Johnathan Doe',
+          password: 'password123',
+          vehicles: [
+            { id: 'v-1', plate: 'CA-88-NX', type: 'Electric Vehicle (EV)', model: 'Tesla Model 3' },
+            { id: 'v-2', plate: 'NY-42-LK', type: 'Sedan', model: 'Honda Civic' }
+          ]
+        },
+        {
+          id: 'u-2',
+          username: 'sarah_connor',
+          fullName: 'Sarah Connor',
+          password: 'password123',
+          vehicles: [
+            { id: 'v-3', plate: 'TX-70-ARM', type: 'SUV', model: 'Jeep Grand Cherokee' }
+          ]
+        }
+      ],
+
+      adminCredentials: {
+        username: 'admin',
+        password: 'admin123',
+        fullName: 'Facility Operations Manager'
+      },
+
+      // Parking Slot Master Grid
+      slots: [],
+
+      // Active & Past Bookings
+      bookings: [],
+
+      // System Notifications
+      notifications: [
+        {
+          id: 'n-1',
+          title: 'System Initialized',
+          message: 'Smart Parking Grid calibrated with real-time zone monitoring.',
+          time: new Date(Date.now() - 3600000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          type: 'system',
+          read: false
+        }
+      ]
+    };
+
+    let state = { ...defaultState };
+
+    /**
+     * Compute Zone based on slot index (1-based)
+     * Row 1 (Slots 1-4): VIP
+     * Row 2 (Slots 5-8): Standard
+     * Rows 3+ (Slots 9+): Economy
+     */
+    function getZoneForSlot(slotNum) {
+      if (slotNum <= 4) return 'VIP';
+      if (slotNum <= 8) return 'STANDARD';
+      return 'ECONOMY';
+    }
+
+    function getZoneRate(zone) {
+      if (zone === 'VIP') return state.config.vipRate;
+      if (zone === 'STANDARD') return state.config.standardRate;
+      return state.config.economyRate;
+    }
+
+    /**
+     * Currency Conversion & Formatting Engine
+     */
+    function formatCurrency(amountUSD) {
+      if (amountUSD === undefined || amountUSD === null || isNaN(amountUSD)) return '—';
+      const cur = CURRENCIES[state.selectedCurrency] || CURRENCIES.USD;
+      const converted = amountUSD * cur.rate;
+      if (cur.decimals === 0) {
+        return `${cur.symbol}${Math.round(converted).toLocaleString()}`;
+      }
+      return `${cur.symbol}${converted.toFixed(cur.decimals)}`;
+    }
+
+    function getCurrencySymbol() {
+      const cur = CURRENCIES[state.selectedCurrency] || CURRENCIES.USD;
+      return cur.symbol.trim();
+    }
+
+    function setCurrency(curCode) {
+      if (CURRENCIES[curCode]) {
+        state.selectedCurrency = curCode;
+        saveState();
+        playChime('click');
+        showToast('Currency Switched', `Active currency set to ${CURRENCIES[curCode].name} (${CURRENCIES[curCode].symbol.trim()})`, 'info');
+        render();
+      }
+    }
+
+    function getZoneColorClass(zone) {
+      switch (zone) {
+        case 'VIP':
+          return {
+            badge: 'bg-amber-100 text-amber-800 border-amber-300',
+            border: 'border-amber-300',
+            bgLight: 'bg-amber-50/60',
+            icon: 'fa-crown text-amber-600',
+            name: 'VIP Zone'
+          };
+        case 'STANDARD':
+          return {
+            badge: 'bg-blue-100 text-blue-800 border-blue-300',
+            border: 'border-blue-300',
+            bgLight: 'bg-blue-50/60',
+            icon: 'fa-shield-halved text-blue-600',
+            name: 'Standard Zone'
+          };
+        case 'ECONOMY':
+        default:
+          return {
+            badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+            border: 'border-emerald-300',
+            bgLight: 'bg-emerald-50/60',
+            icon: 'fa-leaf text-emerald-600',
+            name: 'Economy Zone'
+          };
+      }
+    }
+
+    /**
+     * Generate or Sync Slots to match state.config.totalSlots
+     */
+    function syncSlotsToConfig() {
+      const targetCount = state.config.totalSlots;
+      const currentSlots = [...state.slots];
+
+      if (currentSlots.length === 0) {
+        // First initialization: generate seed slots with 2 demo occupied slots
+        const newSlots = [];
+        for (let i = 1; i <= targetCount; i++) {
+          const zone = getZoneForSlot(i);
+          const prefix = zone === 'VIP' ? 'V' : zone === 'STANDARD' ? 'S' : 'E';
+          const code = `${prefix}-${String(i).padStart(2, '0')}`;
+          
+          let status = 'FREE';
+          let occupiedData = null;
+
+          // Seed slot 2 as occupied by Sarah Connor
+          if (i === 2) {
+            status = 'OCCUPIED';
+            const bookingId = 'bk-seed-1';
+            occupiedData = {
+              bookingId: bookingId,
+              userId: 'u-2',
+              userName: 'Sarah Connor',
+              plate: 'TX-70-ARM',
+              vehicleType: 'SUV',
+              timeSlot: '09:00 AM - 11:00 AM',
+              bookedAt: Date.now() - (6 * 60 * 1000), // 6 minutes ago (within 15 min cancel window)
+              durationHours: 2,
+              totalCost: 30.00
+            };
+            state.bookings.push({
+              id: bookingId,
+              slotId: i,
+              slotCode: code,
+              zone: zone,
+              userId: 'u-2',
+              userName: 'Sarah Connor',
+              plate: 'TX-70-ARM',
+              vehicleType: 'SUV',
+              timeSlot: '09:00 AM - 11:00 AM',
+              bookedAt: Date.now() - (6 * 60 * 1000),
+              durationHours: 2,
+              totalCost: 30.00,
+              status: 'ACTIVE'
+            });
+          }
+
+          // Seed slot 6 as occupied by demo John Doe
+          if (i === 6) {
+            status = 'OCCUPIED';
+            const bookingId = 'bk-seed-2';
+            occupiedData = {
+              bookingId: bookingId,
+              userId: 'u-1',
+              userName: 'Johnathan Doe',
+              plate: 'CA-88-NX',
+              vehicleType: 'Electric Vehicle (EV)',
+              timeSlot: '10:00 AM - 01:00 PM',
+              bookedAt: Date.now() - (4 * 60 * 1000), // 4 minutes ago (can cancel)
+              durationHours: 3,
+              totalCost: 24.00
+            };
+            state.bookings.push({
+              id: bookingId,
+              slotId: i,
+              slotCode: code,
+              zone: zone,
+              userId: 'u-1',
+              userName: 'Johnathan Doe',
+              plate: 'CA-88-NX',
+              vehicleType: 'Electric Vehicle (EV)',
+              timeSlot: '10:00 AM - 01:00 PM',
+              bookedAt: Date.now() - (4 * 60 * 1000),
+              durationHours: 3,
+              totalCost: 24.00,
+              status: 'ACTIVE'
+            });
+          }
+
+          newSlots.push({
+            id: i,
+            code: code,
+            zone: zone,
+            status: status,
+            booking: occupiedData
+          });
+        }
+        state.slots = newSlots;
+      } else {
+        // Re-scale while preserving existing slots and bookings
+        if (targetCount > currentSlots.length) {
+          for (let i = currentSlots.length + 1; i <= targetCount; i++) {
+            const zone = getZoneForSlot(i);
+            const prefix = zone === 'VIP' ? 'V' : zone === 'STANDARD' ? 'S' : 'E';
+            currentSlots.push({
+              id: i,
+              code: `${prefix}-${String(i).padStart(2, '0')}`,
+              zone: zone,
+              status: 'FREE',
+              booking: null
+            });
+          }
+          state.slots = currentSlots;
+        } else if (targetCount < currentSlots.length) {
+          // Truncate only if slots above targetCount are free, or force release them with warning
+          const toRemove = currentSlots.slice(targetCount);
+          toRemove.forEach(slot => {
+            if (slot.status === 'OCCUPIED' && slot.booking) {
+              const bIndex = state.bookings.findIndex(b => b.id === slot.booking.bookingId);
+              if (bIndex !== -1) state.bookings[bIndex].status = 'TERMINATED_BY_ADMIN';
+            }
+          });
+          state.slots = currentSlots.slice(0, targetCount);
+        }
+        // Always refresh zone assignments & codes according to current index
+        state.slots.forEach(slot => {
+          slot.zone = getZoneForSlot(slot.id);
+          const prefix = slot.zone === 'VIP' ? 'V' : slot.zone === 'STANDARD' ? 'S' : 'E';
+          slot.code = `${prefix}-${String(slot.id).padStart(2, '0')}`;
+        });
+      }
+      saveState();
+    }
+
+    /**
+     * Persistence Layer
+     */
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (e) {
+        console.error('Storage write error:', e);
+      }
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          // Merge to retain function and prototype integrity
+          state = { ...defaultState, ...parsed };
+        }
+      } catch (e) {
+        console.warn('Could not load existing state, using defaults.', e);
+      }
+      syncSlotsToConfig();
+    }
+
+    /**
+     * Native Web Audio Synthesizer (Zero External Dependencies)
+     */
+    function playChime(type = 'click') {
+      if (!state.soundEnabled) return;
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+
+        if (type === 'success') {
+          const osc1 = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc1.type = 'sine';
+          osc2.type = 'triangle';
+          osc1.frequency.setValueAtTime(523.25, now); // C5
+          osc1.frequency.exponentialRampToValueAtTime(783.99, now + 0.12); // G5
+          osc2.frequency.setValueAtTime(659.25, now); // E5
+          osc2.frequency.exponentialRampToValueAtTime(1046.50, now + 0.12); // C6
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+          osc1.connect(gain);
+          osc2.connect(gain);
+          gain.connect(ctx.destination);
+          osc1.start(now);
+          osc2.start(now);
+          osc1.stop(now + 0.32);
+          osc2.stop(now + 0.32);
+        } else if (type === 'cancel') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(587.33, now); // D5
+          osc.frequency.exponentialRampToValueAtTime(329.63, now + 0.22); // E4
+          gain.gain.setValueAtTime(0.1, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.28);
+        } else if (type === 'click') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(800, now);
+          gain.gain.setValueAtTime(0.05, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.04);
+        }
+      } catch (err) {
+        // AudioContext ignored if blocked
+      }
+    }
+
+    function toggleSound() {
+      state.soundEnabled = !state.soundEnabled;
+      saveState();
+      if (state.soundEnabled) playChime('click');
+      showToast('Interface Audio', state.soundEnabled ? 'Sound effects enabled.' : 'Sound effects muted.', 'info');
+      render();
+    }
+
+    /**
+     * Notifications & Toasts
+     */
+    function addNotification(title, message, type = 'info') {
+      const notif = {
+        id: 'notif-' + Date.now() + Math.random().toString(36).substr(2, 4),
+        title,
+        message,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        type,
+        read: false
+      };
+      state.notifications.unshift(notif);
+      if (state.notifications.length > 30) state.notifications.pop();
+      saveState();
+      updateNotificationBadge();
+      showToast(title, message, type);
+    }
+
+    function showToast(title, message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      toast.className = `p-4 rounded-xl shadow-xl border flex items-start gap-3 pointer-events-auto transition-all duration-300 transform translate-y-2 opacity-0 text-sm ${
+        type === 'success' ? 'bg-emerald-50 border-emerald-300 text-emerald-900' :
+        type === 'error' ? 'bg-rose-50 border-rose-300 text-rose-900' :
+        type === 'warning' ? 'bg-amber-50 border-amber-300 text-amber-900' :
+        'bg-slate-900 border-slate-800 text-white'
+      }`;
+
+      const icon = type === 'success' ? 'fa-circle-check text-emerald-500' :
+                   type === 'error' ? 'fa-circle-exclamation text-rose-500' :
+                   type === 'warning' ? 'fa-triangle-exclamation text-amber-500' :
+                   'fa-circle-info text-blue-400';
+
+      toast.innerHTML = `
+        <i class="fa-solid ${icon} text-lg mt-0.5"></i>
+        <div class="flex-1">
+          <div class="font-bold text-sm leading-tight">${title}</div>
+          <div class="text-xs opacity-90 mt-0.5 leading-snug">${message}</div>
+        </div>
+      `;
+
+      container.appendChild(toast);
+      // Trigger animation
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-x-full');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    function toggleNotificationDrawer() {
+      const drawer = document.getElementById('notification-drawer');
+      const backdrop = document.getElementById('drawer-backdrop');
+      if (!drawer || !backdrop) return;
+
+      const isOpen = !drawer.classList.contains('translate-x-full');
+      if (isOpen) {
+        drawer.classList.add('translate-x-full');
+        backdrop.classList.add('hidden');
+      } else {
+        renderNotificationsList();
+        drawer.classList.remove('translate-x-full');
+        backdrop.classList.remove('hidden');
+        // Mark all as read
+        state.notifications.forEach(n => n.read = true);
+        saveState();
+        updateNotificationBadge();
+      }
+    }
+
+    function renderNotificationsList() {
+      const list = document.getElementById('notification-list');
+      if (!list) return;
+
+      if (state.notifications.length === 0) {
+        list.innerHTML = `
+          <div class="text-center py-12 text-slate-400">
+            <i class="fa-regular fa-bell-slash text-4xl mb-3 block"></i>
+            <p class="text-sm">No new notifications</p>
+          </div>
+        `;
+        return;
+      }
+
+      list.innerHTML = state.notifications.map(n => `
+        <div class="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition shadow-2xs">
+          <div class="flex items-center justify-between text-xs mb-1">
+            <span class="font-bold text-slate-800 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full ${n.type === 'success' ? 'bg-emerald-500' : n.type === 'warning' ? 'bg-amber-500' : n.type === 'error' ? 'bg-rose-500' : 'bg-brand-500'}"></span>
+              ${n.title}
+            </span>
+            <span class="text-slate-400 font-mono text-[11px]">${n.time}</span>
+          </div>
+          <p class="text-xs text-slate-600 pl-3.5">${n.message}</p>
+        </div>
+      `).join('');
+    }
+
+    function clearAllNotifications() {
+      state.notifications = [];
+      saveState();
+      renderNotificationsList();
+      updateNotificationBadge();
+      showToast('Notifications Cleared', 'All activity logs have been cleared.', 'info');
+    }
+
+    function updateNotificationBadge() {
+      const badge = document.getElementById('notification-badge-count');
+      if (!badge) return;
+      const unreadCount = state.notifications.filter(n => !n.read).length;
+      if (unreadCount > 0) {
+        badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    /**
+     * Navigation & Portal Switching
+     */
+    function setPortal(portalName, authMode = 'LOGIN') {
+      state.portal = portalName;
+      state.authMode = authMode;
+      saveState();
+      render();
+    }
+
+    function handleLogout() {
+      state.currentUser = null;
+      state.currentAdmin = null;
+      state.portal = 'SELECT';
+      saveState();
+      showToast('Logged Out', 'You have securely signed out of the system.', 'info');
+      render();
+    }
+
+    /**
+     * User Authentication & Vehicle Handling
+     */
+    function handleUserLogin(e) {
+      e.preventDefault();
+      const usernameInput = document.getElementById('login-username').value.trim();
+      const passwordInput = document.getElementById('login-password').value;
+
+      const user = state.users.find(u => u.username.toLowerCase() === usernameInput.toLowerCase() && u.password === passwordInput);
+      if (user) {
+        state.currentUser = user;
+        state.portal = 'USER_DASHBOARD';
+        saveState();
+        addNotification('User Authenticated', `Welcome back, ${user.fullName}!`, 'success');
+        render();
+      } else {
+        showToast('Login Failed', 'Invalid username or password. Try demo: john_doe / password123', 'error');
+      }
+    }
+
+    function fillDemoUser() {
+      const u = document.getElementById('login-username');
+      const p = document.getElementById('login-password');
+      if (u && p) {
+        u.value = 'john_doe';
+        p.value = 'password123';
+      }
+    }
+
+    function fillDemoAdmin() {
+      const u = document.getElementById('admin-username');
+      const p = document.getElementById('admin-password');
+      if (u && p) {
+        u.value = 'admin';
+        p.value = 'admin123';
+      }
+    }
+
+    function handleUserSignUp(e) {
+      e.preventDefault();
+      const fullName = document.getElementById('signup-fullname').value.trim();
+      const username = document.getElementById('signup-username').value.trim();
+      const password = document.getElementById('signup-password').value;
+      const plate = document.getElementById('signup-plate').value.trim().toUpperCase();
+      const vehicleType = document.getElementById('signup-vehicle-type').value;
+
+      if (!fullName || !username || !password || !plate) {
+        showToast('Error', 'Please complete all required fields.', 'warning');
+        return;
+      }
+
+      if (state.users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
+        showToast('Username Taken', 'Please choose a different username.', 'error');
+        return;
+      }
+
+      const newUser = {
+        id: 'u-' + Date.now(),
+        fullName,
+        username,
+        password,
+        vehicles: [
+          {
+            id: 'v-' + Date.now(),
+            plate,
+            type: vehicleType,
+            model: vehicleType
+          }
+        ]
+      };
+
+      state.users.push(newUser);
+      state.currentUser = newUser;
+      state.portal = 'USER_DASHBOARD';
+      saveState();
+
+      addNotification('New Account Created', `Welcome to ParkFlow, ${fullName}! Your primary vehicle ${plate} is registered.`, 'success');
+      render();
+    }
+
+    function handleAdminLogin(e) {
+      e.preventDefault();
+      const user = document.getElementById('admin-username').value.trim();
+      const pass = document.getElementById('admin-password').value;
+
+      if (user === state.adminCredentials.username && pass === state.adminCredentials.password) {
+        state.currentAdmin = {
+          username: user,
+          fullName: state.adminCredentials.fullName
+        };
+        state.portal = 'ADMIN_DASHBOARD';
+        saveState();
+        addNotification('Admin Sign In', 'Administrator authenticated with full system privileges.', 'info');
+        render();
+      } else {
+        showToast('Access Denied', 'Invalid Administrator credentials. Default: admin / admin123', 'error');
+      }
+    }
+
+    /**
+     * Add / Remove Vehicles for Current User
+     */
+    function showQuickAddVehicleModal() {
+      const modal = document.getElementById('quick-vehicle-modal');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeQuickVehicleModal() {
+      const modal = document.getElementById('quick-vehicle-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function handleQuickAddVehicle(e) {
+      e.preventDefault();
+      if (!state.currentUser) return;
+
+      const plateInput = document.getElementById('quick-plate').value.trim().toUpperCase();
+      const vtype = document.getElementById('quick-vtype').value;
+      const vmodel = document.getElementById('quick-vmodel').value.trim() || vtype;
+
+      if (!plateInput) return;
+
+      // Check if user already has this vehicle
+      const existing = state.currentUser.vehicles.find(v => v.plate === plateInput);
+      if (existing) {
+        showToast('Vehicle Exists', 'This license plate is already registered to your profile.', 'warning');
+        return;
+      }
+
+      const newVehicle = {
+        id: 'v-' + Date.now(),
+        plate: plateInput,
+        type: vtype,
+        model: vmodel
+      };
+
+      state.currentUser.vehicles.push(newVehicle);
+      
+      // Update in master users array
+      const userIdx = state.users.findIndex(u => u.id === state.currentUser.id);
+      if (userIdx !== -1) {
+        state.users[userIdx].vehicles = [...state.currentUser.vehicles];
+      }
+
+      saveState();
+      closeQuickVehicleModal();
+      document.getElementById('quick-plate').value = '';
+      document.getElementById('quick-vmodel').value = '';
+
+      showToast('Vehicle Added', `Vehicle ${plateInput} registered successfully.`, 'success');
+      
+      // If booking modal was open, refresh vehicle select
+      populateBookingVehicleSelect();
+      render();
+    }
+
+    function removeVehicle(vehicleId) {
+      if (!state.currentUser) return;
+      if (state.currentUser.vehicles.length <= 1) {
+        showToast('Action Disallowed', 'You must maintain at least one registered vehicle on file.', 'warning');
+        return;
+      }
+
+      // Check if vehicle is currently in an active parking slot
+      const vehicle = state.currentUser.vehicles.find(v => v.id === vehicleId);
+      if (vehicle) {
+        const isParked = state.slots.some(s => s.status === 'OCCUPIED' && s.booking && s.booking.plate === vehicle.plate);
+        if (isParked) {
+          showToast('Vehicle In Use', `Vehicle ${vehicle.plate} is currently parked in an active slot and cannot be removed.`, 'error');
+          return;
+        }
+      }
+
+      state.currentUser.vehicles = state.currentUser.vehicles.filter(v => v.id !== vehicleId);
+      const userIdx = state.users.findIndex(u => u.id === state.currentUser.id);
+      if (userIdx !== -1) {
+        state.users[userIdx].vehicles = [...state.currentUser.vehicles];
+      }
+      saveState();
+      showToast('Vehicle Removed', 'The vehicle profile has been deleted.', 'info');
+      render();
+    }
+
+    /**
+     * Booking Engine
+     */
+    function openBookingModal(slotId) {
+      if (!state.currentUser) {
+        showToast('Login Required', 'Please log in to your user account to book a parking slot.', 'warning');
+        setPortal('USER_AUTH', 'LOGIN');
+        return;
+      }
+
+      const slot = state.slots.find(s => s.id === slotId);
+      if (!slot) return;
+      if (slot.status === 'OCCUPIED') {
+        showToast('Slot Unavailable', 'This parking slot is currently occupied.', 'warning');
+        return;
+      }
+
+      const modal = document.getElementById('booking-modal');
+      document.getElementById('booking-slot-id').value = slot.id;
+      document.getElementById('modal-slot-title').textContent = `Book Slot ${slot.code}`;
+      
+      const rate = getZoneRate(slot.zone);
+      document.getElementById('modal-slot-rate').innerHTML = `${formatCurrency(rate)} <span class="text-xs text-slate-500 font-normal">/ hour</span>`;
+
+      // Zone badge
+      const zBadge = document.getElementById('modal-zone-badge');
+      const zColor = getZoneColorClass(slot.zone);
+      zBadge.className = `px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider ${zColor.badge}`;
+      zBadge.textContent = zColor.name;
+
+      const features = slot.zone === 'VIP' ? 'Priority Access &bull; EV Fast Charger &bull; 24/7 Monitored' :
+                       slot.zone === 'STANDARD' ? 'Covered Stall &bull; Security Cam &bull; Wide Bay' :
+                       'Self-Service &bull; Standard Dimensions &bull; Well Lit';
+      document.getElementById('modal-slot-features').innerHTML = features;
+
+      populateBookingVehicleSelect();
+      calculateBookingCost();
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeBookingModal() {
+      const modal = document.getElementById('booking-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function populateBookingVehicleSelect() {
+      const select = document.getElementById('booking-vehicle-select');
+      if (!select || !state.currentUser) return;
+
+      select.innerHTML = state.currentUser.vehicles.map(v => {
+        // Check if currently parked
+        const isParked = state.slots.some(s => s.status === 'OCCUPIED' && s.booking && s.booking.plate === v.plate);
+        return `<option value="${v.plate}" ${isParked ? 'data-parked="true"' : ''}>
+          ${v.plate} — ${v.model} (${v.type}) ${isParked ? '[CURRENTLY PARKED]' : ''}
+        </option>`;
+      }).join('');
+
+      validateSelectedVehicle();
+      select.onchange = validateSelectedVehicle;
+    }
+
+    function validateSelectedVehicle() {
+      const select = document.getElementById('booking-vehicle-select');
+      const warning = document.getElementById('vehicle-warning');
+      const submitBtn = document.getElementById('submit-booking-btn');
+      if (!select || !warning || !submitBtn) return;
+
+      const selectedOption = select.options[select.selectedIndex];
+      const isParked = selectedOption ? selectedOption.getAttribute('data-parked') === 'true' : false;
+
+      if (isParked) {
+        warning.classList.remove('hidden');
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      } else {
+        warning.classList.add('hidden');
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      }
+    }
+
+    function calculateBookingCost() {
+      const slotId = parseInt(document.getElementById('booking-slot-id').value);
+      const slot = state.slots.find(s => s.id === slotId);
+      if (!slot) return;
+
+      const startTimeStr = document.getElementById('booking-start-time').value;
+      const durationHours = parseInt(document.getElementById('booking-duration').value);
+
+      const rate = getZoneRate(slot.zone);
+      const totalCost = rate * durationHours;
+
+      // Calculate end time string
+      const [startH, startM] = startTimeStr.split(':').map(Number);
+      const endH = (startH + durationHours) % 24;
+      const formatTime = (h, m) => {
+        const period = h >= 12 ? 'PM' : 'AM';
+        const formattedH = h % 12 === 0 ? 12 : h % 12;
+        return `${String(formattedH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`;
+      };
+
+      const windowDisplay = `${formatTime(startH, startM)} — ${formatTime(endH, startM)}`;
+      document.getElementById('booking-window-display').textContent = windowDisplay;
+      document.getElementById('booking-total-cost').textContent = formatCurrency(totalCost);
+    }
+
+    function handleBookingSubmit(e) {
+      e.preventDefault();
+      if (!state.currentUser) return;
+
+      const slotId = parseInt(document.getElementById('booking-slot-id').value);
+      const slot = state.slots.find(s => s.id === slotId);
+      if (!slot || slot.status === 'OCCUPIED') {
+        showToast('Error', 'Slot is already occupied.', 'error');
+        closeBookingModal();
+        return;
+      }
+
+      const plate = document.getElementById('booking-vehicle-select').value;
+      const vehicle = state.currentUser.vehicles.find(v => v.plate === plate);
+      if (!vehicle) {
+        showToast('Error', 'Invalid vehicle selected.', 'error');
+        return;
+      }
+
+      // Check double-booking for same vehicle
+      const isAlreadyParked = state.slots.some(s => s.status === 'OCCUPIED' && s.booking && s.booking.plate === plate);
+      if (isAlreadyParked) {
+        showToast('Vehicle Active', `Vehicle ${plate} is already parked in another bay. Select a different registered vehicle.`, 'error');
+        return;
+      }
+
+      const startTimeStr = document.getElementById('booking-start-time').value;
+      const durationHours = parseInt(document.getElementById('booking-duration').value);
+      const rate = getZoneRate(slot.zone);
+      const totalCost = rate * durationHours;
+
+      const [startH, startM] = startTimeStr.split(':').map(Number);
+      const endH = (startH + durationHours) % 24;
+      const formatTime = (h, m) => {
+        const period = h >= 12 ? 'PM' : 'AM';
+        const formattedH = h % 12 === 0 ? 12 : h % 12;
+        return `${String(formattedH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`;
+      };
+      const timeSlotString = `${formatTime(startH, startM)} - ${formatTime(endH, startM)}`;
+
+      const bookingId = 'bk-' + Date.now();
+      const bookingData = {
+        bookingId: bookingId,
+        userId: state.currentUser.id,
+        userName: state.currentUser.fullName,
+        plate: plate,
+        vehicleType: vehicle.type,
+        timeSlot: timeSlotString,
+        bookedAt: Date.now(),
+        durationHours: durationHours,
+        totalCost: totalCost
+      };
+
+      // Occupy slot
+      slot.status = 'OCCUPIED';
+      slot.booking = bookingData;
+
+      // Add to bookings history
+      state.bookings.unshift({
+        id: bookingId,
+        slotId: slot.id,
+        slotCode: slot.code,
+        zone: slot.zone,
+        userId: state.currentUser.id,
+        userName: state.currentUser.fullName,
+        plate: plate,
+        vehicleType: vehicle.type,
+        timeSlot: timeSlotString,
+        bookedAt: Date.now(),
+        durationHours: durationHours,
+        totalCost: totalCost,
+        status: 'ACTIVE'
+      });
+
+      saveState();
+      closeBookingModal();
+
+      addNotification(
+        'Slot Booked Successfully',
+        `Slot ${slot.code} (${slot.zone}) reserved for vehicle ${plate} (${timeSlotString}).`,
+        'success'
+      );
+
+      render();
+    }
+
+    /**
+     * Booking Cancellation (Strict 15-Minute Rule)
+     */
+    function cancelBooking(bookingId) {
+      const booking = state.bookings.find(b => b.id === bookingId);
+      if (!booking) return;
+
+      const elapsedMs = Date.now() - booking.bookedAt;
+      const fifteenMinutesMs = 15 * 60 * 1000;
+
+      if (elapsedMs > fifteenMinutesMs) {
+        showToast('Cancellation Expired', 'Bookings can only be cancelled within 15 minutes of reservation.', 'error');
+        return;
+      }
+
+      if (!confirm(`Are you sure you want to cancel booking for Slot ${booking.slotCode} (${booking.plate})? The slot will be released immediately.`)) {
+        return;
+      }
+
+      // Release slot
+      const slot = state.slots.find(s => s.id === booking.slotId);
+      if (slot) {
+        slot.status = 'FREE';
+        slot.booking = null;
+      }
+
+      booking.status = 'CANCELLED';
+      saveState();
+
+      addNotification(
+        'Booking Cancelled',
+        `Reservation for Slot ${booking.slotCode} (${booking.plate}) was cancelled and the slot has been returned to available inventory.`,
+        'info'
+      );
+
+      render();
+    }
+
+    /**
+     * Administrator System Configuration
+     */
+    function handleAdminConfigUpdate(e) {
+      e.preventDefault();
+      const slotsInput = parseInt(document.getElementById('admin-total-slots').value);
+      const vipPrice = parseFloat(document.getElementById('admin-vip-rate').value);
+      const standardPrice = parseFloat(document.getElementById('admin-standard-rate').value);
+      const economyPrice = parseFloat(document.getElementById('admin-economy-rate').value);
+
+      if (isNaN(slotsInput) || slotsInput < 4 || slotsInput > 24) {
+        showToast('Validation Error', 'Total parking capacity must be between 4 and 24 slots.', 'warning');
+        return;
+      }
+
+      if (isNaN(vipPrice) || isNaN(standardPrice) || isNaN(economyPrice) || vipPrice < 0 || standardPrice < 0 || economyPrice < 0) {
+        showToast('Validation Error', 'Rates must be positive numbers.', 'warning');
+        return;
+      }
+
+      state.config.totalSlots = slotsInput;
+      state.config.vipRate = vipPrice;
+      state.config.standardRate = standardPrice;
+      state.config.economyRate = economyPrice;
+
+      // Sync slots array to reflect new slot count and updated zones
+      syncSlotsToConfig();
+
+      addNotification(
+        'System Parameters Updated',
+        `Admin configured: ${slotsInput} Total Slots. Rates: VIP ${formatCurrency(vipPrice)}, Standard ${formatCurrency(standardPrice)}, Economy ${formatCurrency(economyPrice)}.`,
+        'success'
+      );
+
+      render();
+    }
+
+    function adminForceReleaseSlot(slotId) {
+      const slot = state.slots.find(s => s.id === slotId);
+      if (!slot || slot.status === 'FREE') return;
+
+      if (!confirm(`Administrator Override: Force release Slot ${slot.code} currently occupied by ${slot.booking ? slot.booking.plate : 'unknown'}?`)) {
+        return;
+      }
+
+      const plate = slot.booking ? slot.booking.plate : 'vehicle';
+      if (slot.booking) {
+        const b = state.bookings.find(bk => bk.id === slot.booking.bookingId);
+        if (b) b.status = 'OVERRIDDEN_BY_ADMIN';
+      }
+
+      slot.status = 'FREE';
+      slot.booking = null;
+      saveState();
+
+      addNotification(
+        'Slot Override Executed',
+        `Slot ${slot.code} was manually cleared by Administrator (Plate: ${plate}).`,
+        'warning'
+      );
+
+      render();
+    }
+
+    /**
+     * Helper formatting
+     */
+    function formatTimeRemaining(bookedAt) {
+      const fifteenMinMs = 15 * 60 * 1000;
+      const elapsed = Date.now() - bookedAt;
+      const remaining = fifteenMinMs - elapsed;
+
+      if (remaining <= 0) {
+        return { expired: true, text: 'Window Expired' };
+      }
+
+      const totalSeconds = Math.floor(remaining / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return {
+        expired: false,
+        text: `${minutes}m ${String(seconds).padStart(2, '0')}s left`
+      };
+    }
+
+    /**
+     * Main UI Render Dispatcher
+     */
+    function render() {
+      const app = document.getElementById('app');
+      if (!app) return;
+
+      switch (state.portal) {
+        case 'SELECT':
+          app.innerHTML = renderPortalSelector();
+          break;
+        case 'USER_AUTH':
+          app.innerHTML = renderUserAuth();
+          break;
+        case 'ADMIN_AUTH':
+          app.innerHTML = renderAdminAuth();
+          break;
+        case 'USER_DASHBOARD':
+          app.innerHTML = renderUserDashboard();
+          break;
+        case 'ADMIN_DASHBOARD':
+          app.innerHTML = renderAdminDashboard();
+          break;
+        default:
+          app.innerHTML = renderPortalSelector();
+      }
+
+      updateNotificationBadge();
+    }
+
+    /**
+     * SCREEN 1: Portal Selector Screen
+     */
+    function renderPortalSelector() {
+      return `
+        <div class="flex-1 flex flex-col items-center justify-center p-6 bg-gradient-to-b from-slate-100 via-slate-50 to-slate-100">
+          <!-- Top Header -->
+          <div class="text-center max-w-xl mb-12">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold uppercase tracking-wider mb-4 shadow-2xs">
+              <i class="fa-solid fa-square-parking text-brand-600 text-sm"></i> Smart Parking Infrastructure
+            </div>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight">
+              Park<span class="text-brand-600">Flow</span>
+            </h1>
+            <p class="text-slate-600 mt-3 text-base md:text-lg">
+              Next-generation autonomous parking management platform. Real-time slot allocation, zone-based pricing, and multi-vehicle coordination.
+            </p>
+          </div>
+
+          <!-- Dual Portal Option Cards -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full">
+            
+            <!-- User Portal Card -->
+            <div class="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl hover:shadow-2xl transition duration-300 flex flex-col justify-between group hover:border-brand-500">
+              <div>
+                <div class="w-14 h-14 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition duration-300">
+                  <i class="fa-solid fa-car-rear"></i>
+                </div>
+                <div class="flex items-center gap-2">
+                  <h2 class="text-2xl font-bold text-slate-900">User Portal</h2>
+                  <span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">Drivers & Public</span>
+                </div>
+                <p class="text-slate-600 text-sm mt-3 leading-relaxed">
+                  Reserve parking bays across VIP, Standard, and Economy zones. Real-time visual availability map, vehicle wallet, and instant cancellation protection.
+                </p>
+
+                <div class="mt-6 space-y-2.5 text-xs text-slate-500">
+                  <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-check text-emerald-500"></i>
+                    <span>Live color-coded visual parking grid</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-check text-emerald-500"></i>
+                    <span>Manage multiple license plates simultaneously</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-check text-emerald-500"></i>
+                    <span>15-minute cancellation window with instant release</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-8 pt-6 border-t border-slate-100 flex gap-3">
+                <button onclick="setPortal('USER_AUTH', 'LOGIN')" class="flex-1 py-3 px-4 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2">
+                  <span>Sign In</span>
+                  <i class="fa-solid fa-arrow-right text-xs"></i>
+                </button>
+                <button onclick="setPortal('USER_AUTH', 'SIGNUP')" class="py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-sm transition">
+                  Register
+                </button>
+              </div>
+            </div>
+
+            <!-- Administrator Portal Card -->
+            <div class="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl hover:shadow-2xl transition duration-300 flex flex-col justify-between group hover:border-slate-800">
+              <div>
+                <div class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-800 flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition duration-300">
+                  <i class="fa-solid fa-sliders"></i>
+                </div>
+                <div class="flex items-center gap-2">
+                  <h2 class="text-2xl font-bold text-slate-900">Administrator Portal</h2>
+                  <span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-300">Facility Operations</span>
+                </div>
+                <p class="text-slate-600 text-sm mt-3 leading-relaxed">
+                  Real-time facility orchestration. Dynamically scale slots from 4 to 24, configure zonal hourly tariffs, force release bays, and track live occupancy.
+                </p>
+
+                <div class="mt-6 space-y-2.5 text-xs text-slate-500">
+                  <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-check text-slate-700"></i>
+                    <span>Dynamic capacity configuration (4 to 24 slots)</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-check text-slate-700"></i>
+                    <span>Instant zone pricing sync (VIP, Standard, Economy)</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-check text-slate-700"></i>
+                    <span>Live vehicle inventory & manual override engine</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-8 pt-6 border-t border-slate-100">
+                <button onclick="setPortal('ADMIN_AUTH')" class="w-full py-3 px-4 bg-slate-900 hover:bg-black text-white font-bold rounded-xl text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2">
+                  <i class="fa-solid fa-shield-halved text-xs"></i>
+                  <span>Administrator Sign In</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Bottom Footer Bar -->
+          <div class="mt-12 text-center text-xs text-slate-400">
+            ParkFlow Architecture &bull; Responsive Light Theme &bull; Real-time Local State Synchronization
+          </div>
+        </div>
+      `;
+    }
+
+    /**
+     * SCREEN 2: User Authentication (Login & Signup)
+     */
+    function renderUserAuth() {
+      const isLogin = state.authMode === 'LOGIN';
+
+      return `
+        <div class="flex-1 flex flex-col justify-center items-center p-6 bg-slate-50">
+          <!-- Return Link -->
+          <div class="w-full max-w-md mb-4 flex justify-between items-center">
+            <button onclick="setPortal('SELECT')" class="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-arrow-left"></i> Back to Portal Select
+            </button>
+            <span class="text-xs font-mono text-slate-400">Driver Access</span>
+          </div>
+
+          <div class="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl max-w-md w-full">
+            <div class="flex items-center gap-3 mb-6">
+              <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-car-rear"></i>
+              </div>
+              <div>
+                <h2 class="text-xl font-bold text-slate-900">${isLogin ? 'Driver Sign In' : 'Driver Registration'}</h2>
+                <p class="text-xs text-slate-500">${isLogin ? 'Access your vehicle wallet & bookings' : 'Create an account to reserve parking slots'}</p>
+              </div>
+            </div>
+
+            <!-- Mode Switcher Tabs -->
+            <div class="flex bg-slate-100 p-1 rounded-xl mb-6">
+              <button onclick="setPortal('USER_AUTH', 'LOGIN')" class="flex-1 py-1.5 text-xs font-bold rounded-lg transition ${isLogin ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+                Sign In
+              </button>
+              <button onclick="setPortal('USER_AUTH', 'SIGNUP')" class="flex-1 py-1.5 text-xs font-bold rounded-lg transition ${!isLogin ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+                Create Account
+              </button>
+            </div>
+
+            ${isLogin ? `
+              <!-- Sign In Form -->
+              <form onsubmit="handleUserLogin(event)" class="space-y-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Username</label>
+                  <input type="text" id="login-username" required placeholder="john_doe" value="john_doe" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition">
+                </div>
+
+                <div>
+                  <div class="flex justify-between items-center mb-1">
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Password</label>
+                    <span class="text-[11px] text-slate-400">Demo: password123</span>
+                  </div>
+                  <input type="password" id="login-password" required placeholder="••••••••" value="password123" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition">
+                </div>
+
+                <button type="submit" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-sm shadow-md transition flex items-center justify-center gap-2">
+                  <span>Sign In</span>
+                  <i class="fa-solid fa-arrow-right text-xs"></i>
+                </button>
+
+                <div class="pt-3">
+                  <button type="button" onclick="fillDemoUser()" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-bolt text-amber-500"></i> Autofill Demo User (John Doe)
+                  </button>
+                </div>
+              </form>
+            ` : `
+              <!-- Sign Up Form -->
+              <form onsubmit="handleUserSignUp(event)" class="space-y-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Full Name</label>
+                  <input type="text" id="signup-fullname" required placeholder="e.g. Alex Mercer" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Username</label>
+                    <input type="text" id="signup-username" required placeholder="alex_m" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Password</label>
+                    <input type="password" id="signup-password" required placeholder="••••••••" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none transition">
+                  </div>
+                </div>
+
+                <!-- Primary Vehicle Registration -->
+                <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                  <div class="flex items-center gap-1.5 text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    <i class="fa-solid fa-car text-brand-600"></i> Primary Vehicle Profile
+                  </div>
+
+                  <div>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">License Plate</label>
+                    <input type="text" id="signup-plate" required placeholder="e.g. CA-49-WXY" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm uppercase font-mono font-bold focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                  </div>
+
+                  <div>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">Vehicle Classification</label>
+                    <select id="signup-vehicle-type" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none">
+                      <option value="Sedan">Sedan</option>
+                      <option value="SUV">SUV</option>
+                      <option value="Electric Vehicle (EV)">Electric Vehicle (EV)</option>
+                      <option value="Hatchback">Hatchback</option>
+                      <option value="Truck / Van">Truck / Van</option>
+                      <option value="Motorcycle">Motorcycle</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button type="submit" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm shadow-md transition flex items-center justify-center gap-2">
+                  <i class="fa-solid fa-user-plus text-xs"></i>
+                  <span>Register & Continue</span>
+                </button>
+              </form>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    /**
+     * SCREEN 3: Administrator Authentication
+     */
+    function renderAdminAuth() {
+      return `
+        <div class="flex-1 flex flex-col justify-center items-center p-6 bg-slate-100">
+          <div class="w-full max-w-md mb-4 flex justify-between items-center">
+            <button onclick="setPortal('SELECT')" class="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-arrow-left"></i> Back to Portal Select
+            </button>
+            <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-bold">Admin Level 4</span>
+          </div>
+
+          <div class="bg-white rounded-3xl p-8 border border-slate-300 shadow-2xl max-w-md w-full">
+            <div class="flex items-center gap-3 mb-6">
+              <div class="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center text-xl">
+                <i class="fa-solid fa-user-shield"></i>
+              </div>
+              <div>
+                <h2 class="text-xl font-bold text-slate-900">Facility Operations Sign In</h2>
+                <p class="text-xs text-slate-500">Restricted system administration gateway</p>
+              </div>
+            </div>
+
+            <form onsubmit="handleAdminLogin(event)" class="space-y-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Admin Username</label>
+                <div class="relative">
+                  <i class="fa-solid fa-lock absolute left-3.5 top-3.5 text-slate-400 text-xs"></i>
+                  <input type="text" id="admin-username" required placeholder="admin" value="admin" class="w-full pl-9 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none transition font-mono">
+                </div>
+              </div>
+
+              <div>
+                <div class="flex justify-between items-center mb-1">
+                  <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Access Secret</label>
+                  <span class="text-[11px] text-slate-400">Default: admin123</span>
+                </div>
+                <div class="relative">
+                  <i class="fa-solid fa-key absolute left-3.5 top-3.5 text-slate-400 text-xs"></i>
+                  <input type="password" id="admin-password" required placeholder="••••••••" value="admin123" class="w-full pl-9 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none transition font-mono">
+                </div>
+              </div>
+
+              <button type="submit" class="w-full py-3 bg-slate-900 hover:bg-black text-white font-bold rounded-xl text-sm shadow-md transition flex items-center justify-center gap-2">
+                <i class="fa-solid fa-shield-halved text-xs"></i>
+                <span>Unlock Control Center</span>
+              </button>
+
+              <div class="pt-3">
+                <button type="button" onclick="fillDemoAdmin()" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5">
+                  <i class="fa-solid fa-bolt text-amber-500"></i> Autofill Admin Credentials
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      `;
+    }
+
+    /**
+     * SCREEN 4: User Dashboard & Parking Layout
+     */
+    function renderUserDashboard() {
+      const user = state.currentUser;
+      if (!user) return renderUserAuth();
+
+      // Computations
+      const totalCount = state.slots.length;
+      const occupiedSlots = state.slots.filter(s => s.status === 'OCCUPIED');
+      const freeSlots = state.slots.filter(s => s.status === 'FREE');
+      const userBookings = state.bookings.filter(b => b.userId === user.id && b.status === 'ACTIVE');
+
+      return `
+        <!-- Top Navigation Bar -->
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
+          <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-6">
+              <div class="flex items-center gap-2 cursor-pointer" onclick="scrollToSection('parking-grid-section')">
+                <div class="w-9 h-9 rounded-xl bg-brand-600 text-white flex items-center justify-center font-black text-lg shadow-sm">
+                  P
+                </div>
+                <div>
+                  <span class="text-lg font-extrabold text-slate-900">Park<span class="text-brand-600">Flow</span></span>
+                  <span class="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">User Dashboard</span>
+                </div>
+              </div>
+
+              <!-- Desktop Navigation Links -->
+              <nav class="hidden lg:flex items-center gap-1 text-xs font-bold text-slate-600">
+                <button onclick="scrollToSection('parking-grid-section')" class="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition">
+                  <i class="fa-solid fa-border-all mr-1.5 text-slate-400"></i> Parking Grid
+                </button>
+                <button onclick="scrollToSection('active-bookings-section')" class="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition flex items-center gap-1">
+                  <i class="fa-solid fa-key text-slate-400"></i> Active Bookings
+                  ${userBookings.length > 0 ? `<span class="px-1.5 py-0.2 rounded-full bg-blue-600 text-white text-[10px]">${userBookings.length}</span>` : ''}
+                </button>
+                <button onclick="scrollToSection('vehicles-section')" class="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition flex items-center gap-1">
+                  <i class="fa-solid fa-car text-slate-400"></i> My Vehicles
+                  <span class="px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 text-[10px]">${user.vehicles.length}</span>
+                </button>
+              </nav>
+            </div>
+
+            <!-- Right Profile, Menu & Controls -->
+            <div class="flex items-center gap-2.5">
+              <!-- Currency Switcher -->
+              <div class="relative flex items-center">
+                <select onchange="setCurrency(this.value)" title="Change Display Currency" class="text-xs font-bold px-2 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 outline-none cursor-pointer transition shadow-2xs font-mono">
+                  <option value="USD" ${state.selectedCurrency === 'USD' ? 'selected' : ''}>🇺🇸 USD ($)</option>
+                  <option value="INR" ${state.selectedCurrency === 'INR' ? 'selected' : ''}>🇮🇳 INR (₹)</option>
+                  <option value="EUR" ${state.selectedCurrency === 'EUR' ? 'selected' : ''}>🇪🇺 EUR (€)</option>
+                  <option value="GBP" ${state.selectedCurrency === 'GBP' ? 'selected' : ''}>🇬🇧 GBP (£)</option>
+                  <option value="AED" ${state.selectedCurrency === 'AED' ? 'selected' : ''}>🇦🇪 AED</option>
+                </select>
+              </div>
+
+              <!-- Audio Effects Toggle -->
+              <button onclick="toggleSound()" title="Toggle Sound Effects" class="p-2 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition">
+                <i class="fa-solid ${state.soundEnabled ? 'fa-volume-high text-brand-600' : 'fa-volume-xmark text-slate-400'} text-sm"></i>
+              </button>
+
+              <!-- Notification Bell -->
+              <button onclick="toggleNotificationDrawer()" title="Activity Notifications" class="relative p-2 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition">
+                <i class="fa-solid fa-bell text-base"></i>
+                <span id="notification-badge-count" class="absolute top-1 right-1 w-4 h-4 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center hidden">0</span>
+              </button>
+
+              <!-- Switch Portal Link -->
+              <button onclick="setPortal('SELECT')" title="Switch to Admin or Entry Selector" class="hidden sm:inline-flex text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition items-center gap-1.5">
+                <i class="fa-solid fa-arrow-right-arrow-left text-xs text-brand-600"></i>
+                <span>Switch Portal</span>
+              </button>
+
+              <div class="h-6 w-px bg-slate-200"></div>
+
+              <!-- Dedicated User Menu Dropdown Button -->
+              <div class="relative">
+                <button id="user-menu-btn" onclick="toggleUserMenu(event)" class="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 transition shadow-2xs">
+                  <div class="w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-xs font-black">
+                    ${user.fullName.charAt(0)}
+                  </div>
+                  <span class="hidden md:inline font-bold">${user.fullName.split(' ')[0]}</span>
+                  <i class="fa-solid fa-bars text-slate-500 ml-0.5"></i>
+                </button>
+
+                <!-- User Dropdown Menu -->
+                <div id="user-dropdown-menu" class="hidden absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 py-2 z-50 text-xs animate-in fade-in zoom-in-95 duration-100">
+                  <div class="px-4 py-2.5 border-b border-slate-100 bg-slate-50/50">
+                    <p class="font-bold text-slate-900">${user.fullName}</p>
+                    <p class="text-[11px] text-slate-500 font-mono">@${user.username}</p>
+                  </div>
+
+                  <div class="py-1">
+                    <button onclick="scrollToSection('parking-grid-section'); closeUserMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2.5 text-slate-700 font-medium">
+                      <i class="fa-solid fa-border-all text-brand-600 w-4"></i> Live Parking Grid
+                    </button>
+                    <button onclick="scrollToSection('active-bookings-section'); closeUserMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center justify-between text-slate-700 font-medium">
+                      <span class="flex items-center gap-2.5">
+                        <i class="fa-solid fa-key text-blue-600 w-4"></i> My Active Bookings
+                      </span>
+                      <span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-bold text-[10px]">${userBookings.length}</span>
+                    </button>
+                    <button onclick="scrollToSection('vehicles-section'); closeUserMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center justify-between text-slate-700 font-medium">
+                      <span class="flex items-center gap-2.5">
+                        <i class="fa-solid fa-car-side text-emerald-600 w-4"></i> Vehicle Wallet
+                      </span>
+                      <span class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 font-bold text-[10px]">${user.vehicles.length}</span>
+                    </button>
+                    <button onclick="showQuickAddVehicleModal(); closeUserMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2.5 text-brand-600 font-bold">
+                      <i class="fa-solid fa-plus w-4"></i> Register New Vehicle
+                    </button>
+                  </div>
+
+                  <div class="border-t border-slate-100 py-1">
+                    <div class="px-4 py-2 hover:bg-slate-50 flex items-center justify-between text-slate-700 font-medium">
+                      <span class="flex items-center gap-2.5">
+                        <i class="fa-solid fa-coins text-amber-500 w-4"></i> Currency
+                      </span>
+                      <select onchange="setCurrency(this.value); closeUserMenu();" class="text-xs font-bold px-2 py-0.5 rounded-lg border border-slate-200 bg-white text-slate-800 outline-none cursor-pointer font-mono">
+                        <option value="USD" ${state.selectedCurrency === 'USD' ? 'selected' : ''}>USD ($)</option>
+                        <option value="INR" ${state.selectedCurrency === 'INR' ? 'selected' : ''}>INR (₹)</option>
+                        <option value="EUR" ${state.selectedCurrency === 'EUR' ? 'selected' : ''}>EUR (€)</option>
+                        <option value="GBP" ${state.selectedCurrency === 'GBP' ? 'selected' : ''}>GBP (£)</option>
+                        <option value="AED" ${state.selectedCurrency === 'AED' ? 'selected' : ''}>AED</option>
+                      </select>
+                    </div>
+                    <button onclick="setViewMode(state.viewMode === 'grid' ? 'detailed' : 'grid'); closeUserMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center justify-between text-slate-700 font-medium">
+                      <span class="flex items-center gap-2.5">
+                        <i class="fa-solid fa-table-cells-large text-slate-500 w-4"></i> Switch Layout View
+                      </span>
+                      <span class="uppercase text-[10px] font-mono font-bold text-slate-500">${state.viewMode === 'grid' ? 'Detailed' : 'Block Map'}</span>
+                    </button>
+                    <button onclick="toggleNotificationDrawer(); closeUserMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2.5 text-slate-700 font-medium">
+                      <i class="fa-solid fa-bell text-slate-500 w-4"></i> Activity Notifications
+                    </button>
+                    <button onclick="toggleSound(); closeUserMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center justify-between text-slate-700 font-medium">
+                      <span class="flex items-center gap-2.5">
+                        <i class="fa-solid fa-volume-high text-slate-500 w-4"></i> Sound Effects
+                      </span>
+                      <span class="text-[10px] font-bold ${state.soundEnabled ? 'text-emerald-600' : 'text-slate-400'}">${state.soundEnabled ? 'ON' : 'OFF'}</span>
+                    </button>
+                  </div>
+
+                  <div class="border-t border-slate-100 py-1">
+                    <button onclick="setPortal('ADMIN_AUTH'); closeUserMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2.5 text-slate-700 font-medium">
+                      <i class="fa-solid fa-shield-halved text-slate-500 w-4"></i> Administrator Portal
+                    </button>
+                    <button onclick="setPortal('SELECT'); closeUserMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2.5 text-slate-700 font-medium">
+                      <i class="fa-solid fa-arrows-split-up-and-left text-slate-500 w-4"></i> Portal Selector
+                    </button>
+                    <button onclick="handleLogout()" class="w-full text-left px-4 py-2 hover:bg-rose-50 flex items-center gap-2.5 text-rose-600 font-bold">
+                      <i class="fa-solid fa-arrow-right-from-bracket text-rose-600 w-4"></i> Sign Out
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </header>
+
+        <!-- Main Body -->
+        <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+          
+          <!-- Summary Cards -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            
+            <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+              <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Slots</p>
+                <h3 class="text-3xl font-black text-slate-900 mt-1">${totalCount}</h3>
+                <span class="text-[11px] text-slate-500 mt-0.5 block">Managed Bays</span>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-boxes-stacked"></i>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-5 border border-emerald-200 shadow-sm flex items-center justify-between bg-emerald-50/20">
+              <div>
+                <p class="text-xs font-bold text-emerald-600 uppercase tracking-wider">Available Free</p>
+                <h3 class="text-3xl font-black text-emerald-700 mt-1">${freeSlots.length}</h3>
+                <span class="text-[11px] text-emerald-600 mt-0.5 block">Ready for parking</span>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-circle-check"></i>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-5 border border-rose-200 shadow-sm flex items-center justify-between bg-rose-50/20">
+              <div>
+                <p class="text-xs font-bold text-rose-600 uppercase tracking-wider">Occupied</p>
+                <h3 class="text-3xl font-black text-rose-700 mt-1">${occupiedSlots.length}</h3>
+                <span class="text-[11px] text-rose-600 mt-0.5 block">${Math.round((occupiedSlots.length / totalCount) * 100)}% utilization</span>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-ban"></i>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-5 border border-blue-200 shadow-sm flex items-center justify-between bg-blue-50/20">
+              <div>
+                <p class="text-xs font-bold text-blue-600 uppercase tracking-wider">Your Bookings</p>
+                <h3 class="text-3xl font-black text-blue-700 mt-1">${userBookings.length}</h3>
+                <span class="text-[11px] text-blue-600 mt-0.5 block">Active bays</span>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-key"></i>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Active User Bookings Section (If any) with 15-Minute Countdown Protection -->
+          ${userBookings.length > 0 ? `
+            <div id="active-bookings-section" class="bg-white rounded-2xl border border-blue-200 shadow-sm p-6 overflow-hidden scroll-mt-24">
+              <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2">
+                  <div class="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></div>
+                  <h3 class="font-bold text-slate-900 text-lg">Your Active Reservations</h3>
+                </div>
+                <span class="text-xs text-slate-500">15-minute grace cancellation applies</span>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                ${userBookings.map(b => {
+                  const cancelWindow = formatTimeRemaining(b.bookedAt);
+                  return `
+                    <div class="border border-slate-200 rounded-xl p-4 bg-slate-50/50 hover:bg-white transition shadow-2xs flex flex-col justify-between">
+                      <div>
+                        <div class="flex items-center justify-between mb-2">
+                          <span class="text-xs font-black font-mono px-2 py-0.5 rounded bg-blue-600 text-white">${b.slotCode}</span>
+                          <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">${b.zone} Zone</span>
+                        </div>
+                        <div class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                          <i class="fa-solid fa-car text-slate-500"></i> ${b.plate}
+                        </div>
+                        <div class="text-xs text-slate-500 mt-1">${b.vehicleType} &bull; ${b.timeSlot}</div>
+                        <div class="text-xs font-bold text-slate-700 mt-1">Paid: ${formatCurrency(b.totalCost)}</div>
+                      </div>
+
+                      <div class="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between gap-2">
+                        <div id="booking-timer-${b.id}" class="text-[11px] ${cancelWindow.expired ? 'text-slate-400 font-medium' : 'text-amber-700 font-bold flex items-center gap-1'}">
+                          <i class="fa-solid fa-clock-rotate-left"></i>
+                          <span id="booking-timer-text-${b.id}">${cancelWindow.text}</span>
+                        </div>
+                        <div id="booking-actions-${b.id}" class="flex items-center gap-1.5">
+                          <button onclick="viewParkingPass('${b.id}')" title="View Digital Gate Pass & QR Code" class="px-2.5 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-bold rounded-lg border border-brand-200 transition flex items-center gap-1">
+                            <i class="fa-solid fa-ticket text-xs"></i>
+                            <span>Pass</span>
+                          </button>
+                          ${!cancelWindow.expired ? `
+                            <button id="booking-cancel-btn-${b.id}" onclick="cancelBooking('${b.id}')" class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-2xs hover:shadow-sm transition">
+                              Cancel
+                            </button>
+                          ` : `
+                            <span class="text-[11px] text-slate-400 italic">Locked</span>
+                          `}
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Registered Vehicles Strip & Management -->
+          <div id="vehicles-section" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 scroll-mt-24">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 class="font-bold text-slate-900 text-lg flex items-center gap-2">
+                  <i class="fa-solid fa-id-card text-brand-600"></i> Registered Vehicles Wallet
+                </h3>
+                <p class="text-xs text-slate-500">Book any slot with any of your verified vehicles below</p>
+              </div>
+              <button onclick="showQuickAddVehicleModal()" class="inline-flex items-center gap-2 px-3.5 py-2 bg-brand-50 hover:bg-brand-100 text-brand-700 font-bold rounded-xl text-xs transition border border-brand-200">
+                <i class="fa-solid fa-plus"></i> Add Another Vehicle
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              ${user.vehicles.map(v => {
+                const isParked = state.slots.some(s => s.status === 'OCCUPIED' && s.booking && s.booking.plate === v.plate);
+                return `
+                  <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
+                    <div>
+                      <div class="font-mono font-bold text-slate-900 text-sm tracking-wide flex items-center gap-1.5">
+                        ${v.plate}
+                        ${isParked ? '<span class="text-[9px] px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded font-sans font-bold">PARKED</span>' : ''}
+                      </div>
+                      <div class="text-xs text-slate-500 mt-0.5">${v.model} (${v.type})</div>
+                    </div>
+                    ${user.vehicles.length > 1 ? `
+                      <button onclick="removeVehicle('${v.id}')" title="Delete Vehicle" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-slate-200 transition">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                      </button>
+                    ` : ''}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- Dual-View Live Parking Layout Header & Filters -->
+          <div id="parking-grid-section" class="space-y-4 scroll-mt-24">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 class="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+                  <span>Live Parking Grid</span>
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Live Sync
+                  </span>
+                </h2>
+                <p class="text-xs text-slate-500 mt-0.5">Click any free bay (Emerald) to initiate a time-based booking</p>
+              </div>
+
+              <!-- Controls: Dual-View Switcher + Zone Filter -->
+              <div class="flex flex-wrap items-center gap-2.5">
+                <!-- Zone Filter -->
+                <div class="flex bg-white border border-slate-200 rounded-xl p-1 text-xs">
+                  <button onclick="setFilterZone('ALL')" class="px-3 py-1.5 rounded-lg font-bold transition ${state.filterZone === 'ALL' ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'}">All</button>
+                  <button onclick="setFilterZone('VIP')" class="px-3 py-1.5 rounded-lg font-bold transition ${state.filterZone === 'VIP' ? 'bg-amber-500 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'}">VIP</button>
+                  <button onclick="setFilterZone('STANDARD')" class="px-3 py-1.5 rounded-lg font-bold transition ${state.filterZone === 'STANDARD' ? 'bg-blue-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'}">Standard</button>
+                  <button onclick="setFilterZone('ECONOMY')" class="px-3 py-1.5 rounded-lg font-bold transition ${state.filterZone === 'ECONOMY' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'}">Economy</button>
+                </div>
+
+                <!-- Dual View Toggle -->
+                <div class="flex bg-white border border-slate-200 rounded-xl p-1 text-xs">
+                  <button onclick="setViewMode('grid')" title="Visual Block Map" class="px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 ${state.viewMode === 'grid' ? 'bg-brand-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'}">
+                    <i class="fa-solid fa-border-all"></i>
+                    <span class="hidden sm:inline">Block Map</span>
+                  </button>
+                  <button onclick="setViewMode('detailed')" title="Detailed Cards" class="px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 ${state.viewMode === 'detailed' ? 'bg-brand-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'}">
+                    <i class="fa-solid fa-list-ul"></i>
+                    <span class="hidden sm:inline">Detailed Cards</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Visual Legend Bar -->
+            <div class="flex flex-wrap items-center gap-4 text-xs font-medium text-slate-600 bg-white p-3 rounded-xl border border-slate-200">
+              <span class="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Zone Tariffs:</span>
+              <span class="flex items-center gap-1.5"><i class="fa-solid fa-crown text-amber-500"></i> Row 1 (VIP): <strong>${formatCurrency(state.config.vipRate)}/hr</strong></span>
+              <span class="flex items-center gap-1.5"><i class="fa-solid fa-shield-halved text-blue-500"></i> Row 2 (Standard): <strong>${formatCurrency(state.config.standardRate)}/hr</strong></span>
+              <span class="flex items-center gap-1.5"><i class="fa-solid fa-leaf text-emerald-500"></i> Row 3+ (Economy): <strong>${formatCurrency(state.config.economyRate)}/hr</strong></span>
+              <div class="ml-auto flex items-center gap-3">
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Free</span>
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Occupied</span>
+              </div>
+            </div>
+
+            <!-- Active Slot View (Grid vs Detailed) -->
+            ${state.viewMode === 'grid' ? renderVisualBlockMap() : renderDetailedCardsView()}
+
+          </div>
+
+        </main>
+      `;
+    }
+
+    /**
+     * DUAL-VIEW LAYOUT 1: Visual Block Map
+     * Emerald/Green for Free, Rose/Red for Occupied.
+     * Organized cleanly across VIP, Standard, Economy.
+     */
+    function renderVisualBlockMap() {
+      const filteredSlots = state.slots.filter(s => {
+        if (state.filterZone !== 'ALL' && s.zone !== state.filterZone) return false;
+        if (state.filterStatus !== 'ALL' && s.status !== state.filterStatus) return false;
+        return true;
+      });
+
+      if (filteredSlots.length === 0) {
+        return `
+          <div class="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400">
+            <i class="fa-solid fa-filter text-3xl mb-2"></i>
+            <p class="text-sm font-semibold">No slots match the selected zone filter.</p>
+          </div>
+        `;
+      }
+
+      // Group by Zone for clean layout sections
+      const zones = ['VIP', 'STANDARD', 'ECONOMY'];
+
+      return `
+        <div class="space-y-6">
+          ${zones.map(zoneName => {
+            const zoneSlots = filteredSlots.filter(s => s.zone === zoneName);
+            if (zoneSlots.length === 0) return '';
+
+            const zColor = getZoneColorClass(zoneName);
+            const rate = getZoneRate(zoneName);
+
+            return `
+              <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs">
+                <!-- Zone Section Banner -->
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                  <div class="flex items-center gap-2">
+                    <i class="fa-solid ${zColor.icon}"></i>
+                    <h4 class="font-black text-slate-900 uppercase tracking-wider text-sm">${zColor.name}</h4>
+                    <span class="text-xs px-2 py-0.5 rounded-full ${zColor.badge} font-bold">${formatCurrency(rate)} / hr</span>
+                  </div>
+                  <div class="text-xs text-slate-500">
+                    ${zoneSlots.filter(s => s.status === 'FREE').length} of ${zoneSlots.length} bays free
+                  </div>
+                </div>
+
+                <!-- Slot Card Grid -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4">
+                  ${zoneSlots.map(slot => {
+                    const isOccupied = slot.status === 'OCCUPIED';
+                    const isMyBooking = isOccupied && slot.booking && state.currentUser && slot.booking.userId === state.currentUser.id;
+
+                    return `
+                      <div onclick="${!isOccupied ? `openBookingModal(${slot.id})` : isMyBooking ? `cancelBooking('${slot.booking.bookingId}')` : ''}"
+                        class="parking-slot-card relative p-4 rounded-xl border-2 transition duration-200 flex flex-col justify-between h-36 ${
+                          isOccupied 
+                            ? isMyBooking 
+                              ? 'border-blue-400 bg-blue-50/60 cursor-pointer ring-2 ring-blue-300' 
+                              : 'border-rose-300 bg-rose-50/60 cursor-not-allowed opacity-95' 
+                            : 'border-emerald-300 bg-emerald-50/40 hover:bg-emerald-50 hover:border-emerald-500 cursor-pointer shadow-xs hover:shadow-md'
+                        }">
+                        
+                        <!-- Top Slot Info -->
+                        <div class="flex justify-between items-start">
+                          <div>
+                            <span class="font-mono font-black text-base ${isOccupied ? (isMyBooking ? 'text-blue-900' : 'text-rose-950') : 'text-emerald-950'}">
+                              ${slot.code}
+                            </span>
+                            <span class="block text-[10px] uppercase font-bold text-slate-400">${slot.zone}</span>
+                          </div>
+
+                          <!-- Status Pill -->
+                          <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                            isOccupied 
+                              ? isMyBooking 
+                                ? 'bg-blue-600 text-white' 
+                                : 'bg-rose-600 text-white' 
+                              : 'bg-emerald-600 text-white animate-pulse'
+                          }">
+                            ${isOccupied ? (isMyBooking ? 'YOU' : 'OCCUPIED') : 'FREE'}
+                          </span>
+                        </div>
+
+                        <!-- Center Graphic & Visual Detail -->
+                        <div class="text-center py-1">
+                          ${isOccupied ? `
+                            <div class="text-center">
+                              <i class="fa-solid fa-car-side text-2xl ${isMyBooking ? 'text-blue-600' : 'text-rose-500'}"></i>
+                              <div class="mt-1 font-mono font-bold text-xs text-slate-800 uppercase tracking-wider">
+                                ${slot.booking ? slot.booking.plate : 'PARKED'}
+                              </div>
+                            </div>
+                          ` : `
+                            <div class="text-center">
+                              <div class="w-8 h-8 mx-auto rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-bold">
+                                <i class="fa-solid fa-arrow-down"></i>
+                              </div>
+                              <span class="text-[11px] text-emerald-800 font-semibold block mt-1">Click to Book</span>
+                            </div>
+                          `}
+                        </div>
+
+                        <!-- Bottom Bay Marking / Price -->
+                        <div class="flex justify-between items-center text-[11px] pt-1 border-t border-slate-200/60">
+                          <span class="text-slate-500 font-medium">Tariff</span>
+                          <span class="font-bold text-slate-900">${formatCurrency(rate)}/h</span>
+                        </div>
+
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    /**
+     * DUAL-VIEW LAYOUT 2: Detailed Slot Inventory Cards
+     */
+    function renderDetailedCardsView() {
+      const filteredSlots = state.slots.filter(s => {
+        if (state.filterZone !== 'ALL' && s.zone !== state.filterZone) return false;
+        if (state.filterStatus !== 'ALL' && s.status !== state.filterStatus) return false;
+        return true;
+      });
+
+      return `
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          ${filteredSlots.map(slot => {
+            const isOccupied = slot.status === 'OCCUPIED';
+            const rate = getZoneRate(slot.zone);
+            const zColor = getZoneColorClass(slot.zone);
+            const isMyBooking = isOccupied && slot.booking && state.currentUser && slot.booking.userId === state.currentUser.id;
+
+            return `
+              <div class="bg-white rounded-2xl border ${isOccupied ? 'border-rose-200' : 'border-slate-200'} p-5 shadow-2xs hover:shadow-md transition flex flex-col justify-between">
+                <div>
+                  <div class="flex items-start justify-between">
+                    <div>
+                      <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${zColor.badge}">${zColor.name}</span>
+                      <h4 class="text-xl font-black font-mono text-slate-900 mt-1.5">${slot.code}</h4>
+                    </div>
+                    <span class="text-xs font-black uppercase px-2.5 py-1 rounded-full ${isOccupied ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}">
+                      ${isOccupied ? 'Occupied' : 'Available'}
+                    </span>
+                  </div>
+
+                  <div class="my-4 space-y-2 text-xs">
+                    <div class="flex justify-between text-slate-500">
+                      <span>Hourly Tariff:</span>
+                      <strong class="text-slate-900 text-sm">${formatCurrency(rate)} / hour</strong>
+                    </div>
+                    <div class="flex justify-between text-slate-500">
+                      <span>Bay Amenities:</span>
+                      <span class="text-slate-700 font-medium">${slot.zone === 'VIP' ? 'Fast EV &bull; Concierge' : slot.zone === 'STANDARD' ? 'Covered Roof &bull; CCTV' : 'Standard Paved'}</span>
+                    </div>
+                    ${isOccupied && slot.booking ? `
+                      <div class="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-900 mt-2">
+                        <div class="font-bold flex items-center justify-between">
+                          <span>${slot.booking.plate}</span>
+                          <span class="text-[10px] font-normal">${slot.booking.vehicleType}</span>
+                        </div>
+                        <div class="text-[11px] opacity-80 mt-0.5">${slot.booking.timeSlot}</div>
+                        ${isMyBooking ? '<span class="text-[10px] font-bold text-blue-700 block mt-1">Booked by you</span>' : ''}
+                      </div>
+                    ` : ''}
+                  </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-100">
+                  ${!isOccupied ? `
+                    <button onclick="openBookingModal(${slot.id})" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-xs hover:shadow-sm transition flex items-center justify-center gap-2">
+                      <i class="fa-solid fa-calendar-check"></i> Reserve Slot
+                    </button>
+                  ` : isMyBooking ? `
+                    <button onclick="cancelBooking('${slot.booking.bookingId}')" class="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center justify-center gap-1.5">
+                      <i class="fa-solid fa-xmark"></i> Cancel Booking
+                    </button>
+                  ` : `
+                    <button disabled class="w-full py-2.5 bg-slate-100 text-slate-400 font-bold rounded-xl text-xs cursor-not-allowed">
+                      Currently Unavailable
+                    </button>
+                  `}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    /**
+     * SCREEN 5: Administrator Portal
+     * Dynamic Scaling (4 to 24 slots), Tariff Configuration, Live Inventory Table.
+     */
+    function renderAdminDashboard() {
+      const admin = state.currentAdmin;
+      if (!admin) return renderAdminAuth();
+
+      // Metrics
+      const totalSlots = state.slots.length;
+      const occupiedSlots = state.slots.filter(s => s.status === 'OCCUPIED');
+      const freeSlots = state.slots.filter(s => s.status === 'FREE');
+      const occupancyRate = Math.round((occupiedSlots.length / totalSlots) * 100);
+
+      // Estimated Accrued Revenue
+      const totalRevenue = state.bookings
+        .filter(b => b.status === 'ACTIVE')
+        .reduce((sum, b) => sum + (b.totalCost || 0), 0);
+
+      return `
+        <!-- Admin Navigation Header -->
+        <header class="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-30 shadow-md">
+          <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-6">
+              <div class="flex items-center gap-3 cursor-pointer" onclick="scrollToSection('admin-kpi-section')">
+                <div class="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 text-white flex items-center justify-center font-black text-lg">
+                  <i class="fa-solid fa-sliders text-brand-400 text-sm"></i>
+                </div>
+                <div>
+                  <span class="text-lg font-black tracking-tight">Park<span class="text-brand-400">Flow</span></span>
+                  <span class="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-emerald-400 border border-emerald-500/30">System Console</span>
+                </div>
+              </div>
+
+              <!-- Desktop Navigation Links for Admin -->
+              <nav class="hidden lg:flex items-center gap-1 text-xs font-bold text-slate-400">
+                <button onclick="scrollToSection('admin-kpi-section')" class="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-800 transition">
+                  <i class="fa-solid fa-chart-pie mr-1 text-slate-500"></i> Overview KPIs
+                </button>
+                <button onclick="scrollToSection('admin-config-section')" class="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-800 transition">
+                  <i class="fa-solid fa-gears mr-1 text-slate-500"></i> System Config
+                </button>
+                <button onclick="scrollToSection('admin-inventory-section')" class="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-800 transition">
+                  <i class="fa-solid fa-table-list mr-1 text-slate-500"></i> Live Inventory
+                </button>
+              </nav>
+            </div>
+
+            <!-- Right Profile, Menu & Controls -->
+            <div class="flex items-center gap-2.5">
+              <!-- Currency Switcher -->
+              <div class="relative flex items-center">
+                <select onchange="setCurrency(this.value)" title="Change Display Currency" class="text-xs font-bold px-2 py-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 outline-none cursor-pointer transition shadow-2xs font-mono">
+                  <option value="USD" ${state.selectedCurrency === 'USD' ? 'selected' : ''}>🇺🇸 USD ($)</option>
+                  <option value="INR" ${state.selectedCurrency === 'INR' ? 'selected' : ''}>🇮🇳 INR (₹)</option>
+                  <option value="EUR" ${state.selectedCurrency === 'EUR' ? 'selected' : ''}>🇪🇺 EUR (€)</option>
+                  <option value="GBP" ${state.selectedCurrency === 'GBP' ? 'selected' : ''}>🇬🇧 GBP (£)</option>
+                  <option value="AED" ${state.selectedCurrency === 'AED' ? 'selected' : ''}>🇦🇪 AED</option>
+                </select>
+              </div>
+
+              <!-- Audio Effects Toggle -->
+              <button onclick="toggleSound()" title="Toggle Sound Effects" class="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition">
+                <i class="fa-solid ${state.soundEnabled ? 'fa-volume-high text-brand-400' : 'fa-volume-xmark text-slate-500'} text-sm"></i>
+              </button>
+
+              <!-- Notifications Drawer Toggle -->
+              <button onclick="toggleNotificationDrawer()" title="Activity Notifications" class="relative p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition">
+                <i class="fa-solid fa-bell text-base"></i>
+                <span id="notification-badge-count" class="absolute top-1 right-1 w-4 h-4 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center hidden">0</span>
+              </button>
+
+              <!-- Switch to User Portal View button -->
+              <button onclick="switchToUserView()" title="Inspect as Driver" class="hidden sm:inline-flex text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition items-center gap-1.5">
+                <i class="fa-solid fa-eye text-xs text-brand-400"></i>
+                <span>User View</span>
+              </button>
+
+              <div class="h-6 w-px bg-slate-800"></div>
+
+              <!-- Dedicated Admin Menu Dropdown Button -->
+              <div class="relative">
+                <button id="admin-menu-btn" onclick="toggleAdminMenu(event)" class="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 transition shadow-2xs">
+                  <i class="fa-solid fa-user-shield text-brand-400"></i>
+                  <span>Admin Menu</span>
+                  <i class="fa-solid fa-bars text-slate-400 ml-0.5"></i>
+                </button>
+
+                <!-- Admin Dropdown Menu -->
+                <div id="admin-dropdown-menu" class="hidden absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 py-2 z-50 text-xs text-slate-800 animate-in fade-in zoom-in-95 duration-100">
+                  <div class="px-4 py-2.5 border-b border-slate-100 bg-slate-50/50">
+                    <p class="font-bold text-slate-900">${admin.fullName}</p>
+                    <p class="text-[11px] text-slate-500 font-mono">@${admin.username} &bull; Security Level 4</p>
+                  </div>
+
+                  <div class="py-1">
+                    <button onclick="scrollToSection('admin-config-section'); closeAdminMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2.5 text-slate-700 font-medium">
+                      <i class="fa-solid fa-gears text-brand-600 w-4"></i> System Configuration
+                    </button>
+                    <button onclick="scrollToSection('admin-inventory-section'); closeAdminMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2.5 text-slate-700 font-medium">
+                      <i class="fa-solid fa-table-list text-slate-600 w-4"></i> Live Inventory Table
+                    </button>
+                    <button onclick="exportInventoryCSV(); closeAdminMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2.5 text-emerald-700 font-bold">
+                      <i class="fa-solid fa-file-csv w-4"></i> Export Inventory (CSV)
+                    </button>
+                    <button onclick="resetToFactoryState(); closeAdminMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2.5 text-amber-700 font-bold">
+                      <i class="fa-solid fa-arrow-rotate-left w-4"></i> Reset to Factory Demo
+                    </button>
+                  </div>
+
+                  <div class="border-t border-slate-100 py-1">
+                    <div class="px-4 py-2 hover:bg-slate-50 flex items-center justify-between text-slate-700 font-medium">
+                      <span class="flex items-center gap-2.5">
+                        <i class="fa-solid fa-coins text-amber-500 w-4"></i> Display Currency
+                      </span>
+                      <select onchange="setCurrency(this.value); closeAdminMenu();" class="text-xs font-bold px-2 py-0.5 rounded-lg border border-slate-200 bg-white text-slate-800 outline-none cursor-pointer font-mono">
+                        <option value="USD" ${state.selectedCurrency === 'USD' ? 'selected' : ''}>USD ($)</option>
+                        <option value="INR" ${state.selectedCurrency === 'INR' ? 'selected' : ''}>INR (₹)</option>
+                        <option value="EUR" ${state.selectedCurrency === 'EUR' ? 'selected' : ''}>EUR (€)</option>
+                        <option value="GBP" ${state.selectedCurrency === 'GBP' ? 'selected' : ''}>GBP (£)</option>
+                        <option value="AED" ${state.selectedCurrency === 'AED' ? 'selected' : ''}>AED</option>
+                      </select>
+                    </div>
+                    <button onclick="switchToUserView(); closeAdminMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2.5 text-slate-700 font-medium">
+                      <i class="fa-solid fa-eye text-brand-600 w-4"></i> Test as Driver
+                    </button>
+                    <button onclick="toggleNotificationDrawer(); closeAdminMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2.5 text-slate-700 font-medium">
+                      <i class="fa-solid fa-bell text-slate-500 w-4"></i> Activity Notifications
+                    </button>
+                    <button onclick="toggleSound(); closeAdminMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center justify-between text-slate-700 font-medium">
+                      <span class="flex items-center gap-2.5">
+                        <i class="fa-solid fa-volume-high text-slate-500 w-4"></i> Sound Effects
+                      </span>
+                      <span class="text-[10px] font-bold ${state.soundEnabled ? 'text-emerald-600' : 'text-slate-400'}">${state.soundEnabled ? 'ON' : 'OFF'}</span>
+                    </button>
+                  </div>
+
+                  <div class="border-t border-slate-100 py-1">
+                    <button onclick="setPortal('SELECT'); closeAdminMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2.5 text-slate-700 font-medium">
+                      <i class="fa-solid fa-arrows-split-up-and-left text-slate-500 w-4"></i> Portal Selector
+                    </button>
+                    <button onclick="handleLogout()" class="w-full text-left px-4 py-2 hover:bg-rose-50 flex items-center gap-2.5 text-rose-600 font-bold">
+                      <i class="fa-solid fa-arrow-right-from-bracket text-rose-600 w-4"></i> Sign Out
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </header>
+
+        <!-- Admin Content -->
+        <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+          
+          <!-- KPI Overview Metrics -->
+          <div id="admin-kpi-section" class="grid grid-cols-2 md:grid-cols-4 gap-4 scroll-mt-24">
+            
+            <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+              <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Inventory</p>
+                <h3 class="text-3xl font-black text-slate-900 mt-1">${totalSlots}</h3>
+                <span class="text-[11px] text-slate-500">Configured slots (4-24)</span>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-layer-group"></i>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+              <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Occupancy Rate</p>
+                <h3 class="text-3xl font-black text-brand-600 mt-1">${occupancyRate}%</h3>
+                <span class="text-[11px] text-slate-500">${occupiedSlots.length} active bays</span>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-chart-pie"></i>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+              <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Available Bays</p>
+                <h3 class="text-3xl font-black text-emerald-600 mt-1">${freeSlots.length}</h3>
+                <span class="text-[11px] text-emerald-600">Immediate access</span>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-circle-check"></i>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+              <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Revenue</p>
+                <h3 class="text-3xl font-black text-slate-900 mt-1">${formatCurrency(totalRevenue)}</h3>
+                <span class="text-[11px] text-slate-500">Accrued current bookings</span>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-receipt"></i>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- SYSTEM CONFIGURATION PANEL -->
+          <div id="admin-config-section" class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden scroll-mt-24">
+            <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <i class="fa-solid fa-gears text-brand-600"></i> Dynamic System Configuration Panel
+                </h3>
+                <p class="text-xs text-slate-500">Changes immediately sync with the live customer grid and real-time billing calculations</p>
+              </div>
+              <span class="text-xs font-mono px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-bold self-start sm:self-auto">
+                Instant State Sync
+              </span>
+            </div>
+
+            <form onsubmit="handleAdminConfigUpdate(event)" class="p-6 space-y-6">
+              
+              <!-- Total Slots Dynamic Scaling Control -->
+              <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <label class="text-sm font-bold text-slate-800 uppercase tracking-wider block">Total Parking Slots Scale</label>
+                    <span class="text-xs text-slate-500">Dynamically scale capacity between 4 and 24 parking bays (4 slots per row)</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-2xl font-black text-brand-600 font-mono" id="slot-slider-val">${state.config.totalSlots}</span>
+                    <span class="text-xs text-slate-500 font-bold uppercase">Slots</span>
+                    <span class="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-slate-200 text-slate-700" id="slot-slider-rows">(${Math.ceil(state.config.totalSlots / 4)} Rows)</span>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                  <span class="text-xs font-bold text-slate-500">4</span>
+                  <input type="range" id="admin-total-slots" min="4" max="24" step="1" value="${state.config.totalSlots}"
+                    oninput="document.getElementById('slot-slider-val').textContent = this.value; document.getElementById('slot-slider-rows').textContent = '(' + Math.ceil(this.value / 4) + ' Rows)'"
+                    class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-600">
+                  <span class="text-xs font-bold text-slate-500">24</span>
+                </div>
+              </div>
+
+              <!-- Hourly Pricing Configuration per Zone -->
+              <div>
+                <label class="text-sm font-bold text-slate-800 uppercase tracking-wider block mb-3">Zone-Based Hourly Tariffs</label>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  
+                  <!-- VIP (Row 1) -->
+                  <div class="p-4 rounded-2xl border border-amber-200 bg-amber-50/40 space-y-2">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-bold text-amber-900 uppercase flex items-center gap-1.5">
+                        <i class="fa-solid fa-crown text-amber-600"></i> VIP Zone (Row 1)
+                      </span>
+                      <span class="text-[10px] font-mono text-amber-700 font-bold">Slots 1 - 4</span>
+                    </div>
+                    <div class="relative">
+                      <span class="absolute left-3.5 top-2.5 text-slate-400 font-bold text-sm font-mono">${getCurrencySymbol()}</span>
+                      <input type="number" id="admin-vip-rate" step="0.50" min="1" max="100" value="${state.config.vipRate.toFixed(2)}" required
+                        class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-xl text-sm font-bold font-mono focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                    </div>
+                    <p class="text-[11px] text-amber-800/80">Premium priority stalls with EV fast chargers</p>
+                  </div>
+
+                  <!-- Standard (Row 2) -->
+                  <div class="p-4 rounded-2xl border border-blue-200 bg-blue-50/40 space-y-2">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-bold text-blue-900 uppercase flex items-center gap-1.5">
+                        <i class="fa-solid fa-shield-halved text-blue-600"></i> Standard (Row 2)
+                      </span>
+                      <span class="text-[10px] font-mono text-blue-700 font-bold">Slots 5 - 8</span>
+                    </div>
+                    <div class="relative">
+                      <span class="absolute left-3.5 top-2.5 text-slate-400 font-bold text-sm font-mono">${getCurrencySymbol()}</span>
+                      <input type="number" id="admin-standard-rate" step="0.50" min="1" max="100" value="${state.config.standardRate.toFixed(2)}" required
+                        class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-xl text-sm font-bold font-mono focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                    </div>
+                    <p class="text-[11px] text-blue-800/80">Covered canopy bays with standard security</p>
+                  </div>
+
+                  <!-- Economy (Rows 3+) -->
+                  <div class="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/40 space-y-2">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-bold text-emerald-900 uppercase flex items-center gap-1.5">
+                        <i class="fa-solid fa-leaf text-emerald-600"></i> Economy (Rows 3+)
+                      </span>
+                      <span class="text-[10px] font-mono text-emerald-700 font-bold">Slots 9+</span>
+                    </div>
+                    <div class="relative">
+                      <span class="absolute left-3.5 top-2.5 text-slate-400 font-bold text-sm font-mono">${getCurrencySymbol()}</span>
+                      <input type="number" id="admin-economy-rate" step="0.50" min="1" max="100" value="${state.config.economyRate.toFixed(2)}" required
+                        class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-xl text-sm font-bold font-mono focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                    </div>
+                    <p class="text-[11px] text-emerald-800/80">Value self-park stalls in perimeter zones</p>
+                  </div>
+
+                </div>
+              </div>
+
+              <!-- Submit button -->
+              <div class="flex justify-end pt-2">
+                <button type="submit" class="px-6 py-2.5 bg-slate-900 hover:bg-black text-white font-bold rounded-xl text-sm shadow-md hover:shadow-lg transition flex items-center gap-2">
+                  <i class="fa-solid fa-arrows-rotate"></i>
+                  Apply & Sync Configuration
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- LIVE INVENTORY TABLE -->
+          <div id="admin-inventory-section" class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden scroll-mt-24">
+            <div class="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <i class="fa-solid fa-table-list text-slate-700"></i> Live Parking Bay Inventory Table
+                </h3>
+                <p class="text-xs text-slate-500">Real-time status of all configured slots, allocated plates, assigned drivers, and override controls</p>
+              </div>
+
+              <!-- Quick Table Controls: Filter + Export + Reset -->
+              <div class="flex flex-wrap items-center gap-2">
+                <button onclick="exportInventoryCSV()" title="Export CSV" class="px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs">
+                  <i class="fa-solid fa-file-csv"></i> Export CSV
+                </button>
+                <button onclick="resetToFactoryState()" title="Restore Factory Defaults" class="px-3 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs">
+                  <i class="fa-solid fa-arrow-rotate-left"></i> Reset
+                </button>
+                <select id="admin-filter-status" onchange="setAdminFilterStatus(this.value)" class="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-slate-50 font-bold outline-none">
+                  <option value="ALL" ${state.adminFilterStatus === 'ALL' ? 'selected' : ''}>All Statuses</option>
+                  <option value="FREE" ${state.adminFilterStatus === 'FREE' ? 'selected' : ''}>Available Only</option>
+                  <option value="OCCUPIED" ${state.adminFilterStatus === 'OCCUPIED' ? 'selected' : ''}>Occupied Only</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Table View -->
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
+                    <th class="py-3 px-5">Slot ID</th>
+                    <th class="py-3 px-5">Zone Classification</th>
+                    <th class="py-3 px-5">Status</th>
+                    <th class="py-3 px-5">Hourly Rate</th>
+                    <th class="py-3 px-5">License Plate</th>
+                    <th class="py-3 px-5">Assigned User</th>
+                    <th class="py-3 px-5">Reserved Window</th>
+                    <th class="py-3 px-5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  ${state.slots
+                    .filter(s => {
+                      if (state.adminFilterStatus === 'FREE') return s.status === 'FREE';
+                      if (state.adminFilterStatus === 'OCCUPIED') return s.status === 'OCCUPIED';
+                      return true;
+                    })
+                    .map(slot => {
+                    const isOccupied = slot.status === 'OCCUPIED';
+                    const rate = getZoneRate(slot.zone);
+                    const zColor = getZoneColorClass(slot.zone);
+
+                    return `
+                      <tr class="hover:bg-slate-50/80 transition">
+                        <td class="py-3.5 px-5 font-mono font-bold text-slate-900">${slot.code}</td>
+                        <td class="py-3.5 px-5">
+                          <span class="px-2 py-0.5 rounded-full ${zColor.badge} font-bold text-[11px]">${zColor.name}</span>
+                        </td>
+                        <td class="py-3.5 px-5">
+                          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-bold text-[11px] ${isOccupied ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}">
+                            <span class="w-1.5 h-1.5 rounded-full ${isOccupied ? 'bg-rose-500' : 'bg-emerald-500'}"></span>
+                            ${isOccupied ? 'Occupied' : 'Free'}
+                          </span>
+                        </td>
+                        <td class="py-3.5 px-5 font-bold font-mono text-slate-800">${formatCurrency(rate)}/hr</td>
+                        <td class="py-3.5 px-5 font-mono font-bold ${isOccupied ? 'text-slate-900' : 'text-slate-400'}">
+                          ${isOccupied && slot.booking ? slot.booking.plate : '&mdash;'}
+                        </td>
+                        <td class="py-3.5 px-5 ${isOccupied ? 'text-slate-800 font-semibold' : 'text-slate-400'}">
+                          ${isOccupied && slot.booking ? slot.booking.userName : '&mdash;'}
+                        </td>
+                        <td class="py-3.5 px-5 text-slate-600">
+                          ${isOccupied && slot.booking ? slot.booking.timeSlot : '&mdash;'}
+                        </td>
+                        <td class="py-3.5 px-5 text-right">
+                          ${isOccupied ? `
+                            <button onclick="adminForceReleaseSlot(${slot.id})" title="Force Clear Bay" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg border border-rose-200 transition">
+                              Force Free
+                            </button>
+                          ` : `
+                            <span class="text-slate-400 text-[11px] italic">Idle</span>
+                          `}
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </main>
+      `;
+    }
+
+    /**
+     * UI Filter State Handlers
+     */
+    function setViewMode(mode) {
+      state.viewMode = mode;
+      saveState();
+      render();
+    }
+
+    function setFilterZone(zone) {
+      state.filterZone = zone;
+      render();
+    }
+
+    function setFilterStatus(status) {
+      state.filterStatus = status;
+      render();
+    }
+
+    function setSearchQuery(query) {
+      state.searchQuery = query;
+      // Do not re-render entire tree to prevent losing input focus, only update grid
+      const container = document.getElementById('slots-view-container');
+      if (container) {
+        container.innerHTML = state.viewMode === 'grid' ? renderVisualBlockMap() : renderDetailedCardsView();
+      } else {
+        render();
+      }
+    }
+
+    function setAdminFilterStatus(status) {
+      state.adminFilterStatus = status;
+      render();
+    }
+
+    /**
+     * Interactive Traffic Simulator for Testing & Demos
+     */
+    function simulateArrival() {
+      const freeSlots = state.slots.filter(s => s.status === 'FREE');
+      if (freeSlots.length === 0) {
+        showToast('Facility Full', 'All parking bays are currently occupied!', 'warning');
+        return;
+      }
+      const randomSlot = freeSlots[Math.floor(Math.random() * freeSlots.length)];
+      const demoPlates = ['DL-01-AB-1234', 'MH-02-CP-8899', 'KA-05-EV-4411', 'DL-09-QW-9900', 'HR-26-TX-7733', 'KL-07-ZZ-5522'];
+      const dummyPlate = demoPlates[Math.floor(Math.random() * demoPlates.length)];
+      const dummyNames = ['Vikram Seth', 'Priya Sharma', 'Rahul Mehta', 'Aisha Khan', 'Ananya Patel'];
+      const dummyName = dummyNames[Math.floor(Math.random() * dummyNames.length)];
+      const vTypes = ['Electric Vehicle (EV)', 'Sedan', 'SUV', 'Hatchback'];
+      const vType = vTypes[Math.floor(Math.random() * vTypes.length)];
+      const duration = Math.floor(Math.random() * 3) + 1;
+      const rate = getZoneRate(randomSlot.zone);
+      const cost = rate * duration;
+
+      const bookingId = 'bk-sim-' + Date.now();
+      const bookingData = {
+        bookingId: bookingId,
+        userId: 'u-sim-' + Date.now(),
+        userName: dummyName,
+        plate: dummyPlate,
+        vehicleType: vType,
+        timeSlot: '09:00 AM - 12:00 PM',
+        bookedAt: Date.now(),
+        durationHours: duration,
+        totalCost: cost
+      };
+
+      randomSlot.status = 'OCCUPIED';
+      randomSlot.booking = bookingData;
+
+      state.bookings.unshift({
+        id: bookingId,
+        slotId: randomSlot.id,
+        slotCode: randomSlot.code,
+        zone: randomSlot.zone,
+        userId: bookingData.userId,
+        userName: dummyName,
+        plate: dummyPlate,
+        vehicleType: vType,
+        timeSlot: '09:00 AM - 12:00 PM',
+        bookedAt: Date.now(),
+        durationHours: duration,
+        totalCost: cost,
+        status: 'ACTIVE'
+      });
+
+      saveState();
+      playChime('success');
+      addNotification('Simulation: Vehicle Arrival', `Simulated arrival: ${dummyPlate} (${vType}) parked in Slot ${randomSlot.code}.`, 'info');
+      render();
+    }
+
+    function simulateDeparture() {
+      const occupiedSlots = state.slots.filter(s => s.status === 'OCCUPIED');
+      if (occupiedSlots.length === 0) {
+        showToast('Facility Empty', 'No vehicles currently parked to release.', 'warning');
+        return;
+      }
+      const randomSlot = occupiedSlots[Math.floor(Math.random() * occupiedSlots.length)];
+      const plate = randomSlot.booking ? randomSlot.booking.plate : 'vehicle';
+
+      if (randomSlot.booking) {
+        const b = state.bookings.find(bk => bk.id === randomSlot.booking.bookingId);
+        if (b) b.status = 'COMPLETED';
+      }
+
+      randomSlot.status = 'FREE';
+      randomSlot.booking = null;
+
+      saveState();
+      playChime('cancel');
+      addNotification('Simulation: Vehicle Departure', `Simulated departure: Vehicle ${plate} exited bay ${randomSlot.code}.`, 'info');
+      render();
+    }
+
+    function switchToUserView() {
+      // Pick first demo user if none active
+      if (!state.currentUser) {
+        state.currentUser = state.users[0];
+      }
+      state.portal = 'USER_DASHBOARD';
+      saveState();
+      showToast('Switched to Driver View', 'Viewing interface through client perspective.', 'info');
+      render();
+    }
+
+    /**
+     * Menu Dropdown Controls & Smooth Navigation
+     */
+    function toggleUserMenu(event) {
+      if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
+      const menu = document.getElementById('user-dropdown-menu');
+      if (menu) menu.classList.toggle('hidden');
+    }
+
+    function closeUserMenu() {
+      const menu = document.getElementById('user-dropdown-menu');
+      if (menu) menu.classList.add('hidden');
+    }
+
+    function toggleAdminMenu(event) {
+      if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
+      const menu = document.getElementById('admin-dropdown-menu');
+      if (menu) menu.classList.toggle('hidden');
+    }
+
+    function closeAdminMenu() {
+      const menu = document.getElementById('admin-dropdown-menu');
+      if (menu) menu.classList.add('hidden');
+    }
+
+    function scrollToSection(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    // Global listener to close dropdowns only when clicking outside both button and dropdown menu
+    window.addEventListener('click', (e) => {
+      const uMenu = document.getElementById('user-dropdown-menu');
+      if (uMenu && !uMenu.classList.contains('hidden')) {
+        if (!e.target.closest('#user-menu-btn') && !e.target.closest('#user-dropdown-menu')) {
+          uMenu.classList.add('hidden');
+        }
+      }
+      const aMenu = document.getElementById('admin-dropdown-menu');
+      if (aMenu && !aMenu.classList.contains('hidden')) {
+        if (!e.target.closest('#admin-menu-btn') && !e.target.closest('#admin-dropdown-menu')) {
+          aMenu.classList.add('hidden');
+        }
+      }
+    });
+
+    /**
+     * Digital Parking Pass / E-Ticket Modal
+     */
+    function viewParkingPass(bookingId) {
+      const booking = state.bookings.find(b => b.id === bookingId);
+      if (!booking) return;
+
+      const modal = document.getElementById('ticket-modal');
+      const container = document.getElementById('ticket-content');
+      if (!modal || !container) return;
+
+      const zColor = getZoneColorClass(booking.zone);
+      playChime('click');
+
+      container.innerHTML = `
+        <div class="bg-gradient-to-r from-slate-900 to-slate-800 p-6 text-white text-center relative">
+          <button onclick="closeParkingPassModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/10 text-brand-300 border border-white/10 mb-2">
+            <i class="fa-solid fa-circle-check text-emerald-400"></i> Active Access Pass
+          </div>
+          <h3 class="text-2xl font-black tracking-tight">ParkFlow Digital Gate Pass</h3>
+          <p class="text-xs text-slate-400 mt-1">Scan at Barrier Gate 1 or 2 for automatic entry clearance</p>
+        </div>
+
+        <div class="p-6 space-y-5 bg-white">
+          <div class="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+            <div>
+              <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Assigned Bay</span>
+              <span class="text-3xl font-black font-mono text-slate-900 mt-0.5 block">${booking.slotCode}</span>
+            </div>
+            <div class="text-right">
+              <span class="text-xs font-semibold px-2.5 py-1 rounded-full ${zColor.badge}">${zColor.name}</span>
+              <span class="text-xs font-bold font-mono text-slate-700 block mt-1.5">Paid: ${formatCurrency(booking.totalCost)}</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div class="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+              <span class="text-slate-400 block font-medium">Vehicle Plate</span>
+              <span class="font-mono font-bold text-slate-900 text-sm mt-0.5 block">${booking.plate}</span>
+              <span class="text-[11px] text-slate-500 mt-0.5 block">${booking.vehicleType}</span>
+            </div>
+            <div class="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+              <span class="text-slate-400 block font-medium">Reserved Time Window</span>
+              <span class="font-bold text-slate-900 text-xs mt-0.5 block">${booking.timeSlot}</span>
+              <span class="text-[11px] text-slate-500 mt-0.5 block">${booking.durationHours} Hour Duration</span>
+            </div>
+          </div>
+
+          <div class="text-center p-4 bg-slate-50 border border-dashed border-slate-300 rounded-2xl">
+            <svg class="mx-auto w-32 h-32" viewBox="0 0 100 100" fill="currentColor">
+              <rect x="5" y="5" width="25" height="25" fill="#0f172a" rx="3"/>
+              <rect x="9" y="9" width="17" height="17" fill="#f8fafc"/>
+              <rect x="13" y="13" width="9" height="9" fill="#0f172a"/>
+
+              <rect x="70" y="5" width="25" height="25" fill="#0f172a" rx="3"/>
+              <rect x="74" y="9" width="17" height="17" fill="#f8fafc"/>
+              <rect x="78" y="13" width="9" height="9" fill="#0f172a"/>
+
+              <rect x="5" y="70" width="25" height="25" fill="#0f172a" rx="3"/>
+              <rect x="9" y="74" width="17" height="17" fill="#f8fafc"/>
+              <rect x="13" y="78" width="9" height="9" fill="#0f172a"/>
+
+              <rect x="35" y="10" width="6" height="6" fill="#0f172a"/>
+              <rect x="45" y="15" width="8" height="5" fill="#0f172a"/>
+              <rect x="58" y="8" width="5" height="7" fill="#0f172a"/>
+              <rect x="38" y="24" width="7" height="7" fill="#0f172a"/>
+              <rect x="50" y="28" width="12" height="6" fill="#0f172a"/>
+              
+              <rect x="10" y="38" width="7" height="12" fill="#0f172a"/>
+              <rect x="22" y="44" width="10" height="6" fill="#0f172a"/>
+              <rect x="36" y="38" width="28" height="28" fill="#0284c7" rx="4"/>
+              <path d="M46 45 h8 v14 h-8 z M46 45 h14 v5 h-14 z" fill="#ffffff"/>
+              <rect x="68" y="40" width="8" height="8" fill="#0f172a"/>
+              <rect x="80" y="46" width="10" height="6" fill="#0f172a"/>
+              
+              <rect x="35" y="72" width="12" height="6" fill="#0f172a"/>
+              <rect x="52" y="78" width="8" height="8" fill="#0f172a"/>
+              <rect x="66" y="72" width="7" height="10" fill="#0f172a"/>
+              <rect x="78" y="80" width="12" height="8" fill="#0f172a"/>
+            </svg>
+
+            <div class="mt-3 font-mono text-[11px] font-bold text-slate-700 tracking-wider">
+              REF: ${booking.id.toUpperCase()}
+            </div>
+            <p class="text-[10px] text-slate-400 mt-0.5">Automated Optical License Plate Recognition (ALPR) Linked</p>
+          </div>
+
+          <div class="flex gap-2.5 pt-2">
+            <button type="button" onclick="window.print()" class="flex-1 py-2.5 bg-slate-900 hover:bg-black text-white font-bold rounded-xl text-xs shadow-md transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-print"></i> Print / Save Pass
+            </button>
+            <button type="button" onclick="closeParkingPassModal()" class="px-5 py-2.5 border border-slate-300 hover:bg-slate-100 text-slate-700 font-semibold rounded-xl text-xs transition">
+              Close
+            </button>
+          </div>
+        </div>
+      `;
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeParkingPassModal() {
+      const modal = document.getElementById('ticket-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    /**
+     * CSV Export & Factory Reset Actions
+     */
+    function exportInventoryCSV() {
+      const headers = ['Slot Code', 'Zone', 'Status', 'Hourly Rate', 'License Plate', 'Vehicle Type', 'Assigned Driver', 'Time Window', 'Total Paid'];
+      const rows = state.slots.map(s => [
+        s.code,
+        s.zone,
+        s.status,
+        formatCurrency(getZoneRate(s.zone)),
+        s.booking ? s.booking.plate : 'N/A',
+        s.booking ? s.booking.vehicleType : 'N/A',
+        s.booking ? s.booking.userName : 'N/A',
+        s.booking ? s.booking.timeSlot : 'N/A',
+        s.booking ? formatCurrency(s.booking.totalCost) : formatCurrency(0)
+      ]);
+      
+      const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.map(field => `"${field}"`).join(','))].join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `parkflow_inventory_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      playChime('success');
+      showToast('Export Generated', 'Inventory dataset downloaded as CSV.', 'success');
+    }
+
+    function resetToFactoryState() {
+      if (!confirm('Are you sure you want to reset ParkFlow to clean factory default state? All current reservations and custom vehicles will be refreshed.')) return;
+      localStorage.removeItem(STORAGE_KEY);
+      state = { ...defaultState };
+      syncSlotsToConfig();
+      playChime('cancel');
+      showToast('System Reset', 'System restored to default factory seed state.', 'info');
+      render();
+    }
+
+    /**
+     * Targeted Periodic Refresh for cancellation countdowns
+     * Modifies only the timer labels and action status without wiping/re-rendering DOM,
+     * preventing any UI flickering or dropdown menus from closing.
+     */
+    function updateCancellationCountdowns() {
+      if (state.portal !== 'USER_DASHBOARD' || !state.currentUser) return;
+      const userBookings = state.bookings.filter(b => b.userId === state.currentUser.id && b.status === 'ACTIVE');
+      userBookings.forEach(b => {
+        const cancelWindow = formatTimeRemaining(b.bookedAt);
+        const textSpan = document.getElementById(`booking-timer-text-${b.id}`);
+        const timerContainer = document.getElementById(`booking-timer-${b.id}`);
+        const cancelBtn = document.getElementById(`booking-cancel-btn-${b.id}`);
+        const actionsBox = document.getElementById(`booking-actions-${b.id}`);
+
+        if (textSpan) {
+          textSpan.textContent = cancelWindow.text;
+        }
+
+        if (cancelWindow.expired) {
+          if (timerContainer) {
+            timerContainer.className = 'text-[11px] text-slate-400 font-medium flex items-center gap-1';
+          }
+          if (cancelBtn && actionsBox) {
+            cancelBtn.remove();
+            const lockedSpan = document.createElement('span');
+            lockedSpan.className = 'text-[11px] text-slate-400 italic';
+            lockedSpan.textContent = 'Locked';
+            actionsBox.appendChild(lockedSpan);
+          }
+        }
+      });
+    }
+
+    setInterval(() => {
+      updateCancellationCountdowns();
+    }, 1000); // Check every second for live countdown precision
+
+    // Kickoff Application Initialization
+    document.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      render();
+    });
+  </script>
+</body>
+</html>
