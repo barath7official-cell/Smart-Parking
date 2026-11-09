@@ -22,7 +22,13 @@
 * **Double-Booking Prevention**: Prohibits simultaneous reservations for the same vehicle across different bays.
 * **Administrator Credentials**: Preconfigured high-security operations gateway with single-click demo autofill.
 
-### 3. 🗺️ Dual-View Live Parking Grid
+### 3. 🗺️ Dual Map System & Navigation Hub
+* **In-App Facility Map Viewer**: Displays an interactive embedded map showing the parking facility location configured by the administrator (e.g. "LPU Block 34 Central Parking").
+* **Site Architecture Blueprint Toggle**: Switch seamlessly between the satellite/road view and an architectural site blueprint displaying ingress/egress barrier gates, ALPR scanners, and EV hubs.
+* **Direct Google Maps Navigation Link**: A prominent **"Open in Google Maps / Get Directions"** action button launches turn-by-turn driving directions pre-loaded with the exact parking facility coordinates.
+* **Real-Time Admin State Sync**: Facility name and address changes made by the administrator immediately sync across the customer map, header cards, and gate passes with zero page reload.
+
+### 4. 🅿️ Dual-View Live Parking Grid
 * **Visual Block Map**: Instant color-coded bay status:
   * 🟢 **Emerald (Green)**: Free & available for immediate booking.
   * 🔴 **Rose (Red)**: Currently occupied by another driver.
@@ -34,17 +40,28 @@
   * 🍃 **Economy Zone (Rows 3+ / Slots 9–24)**: Perimeter self-park stalls.
 * **Dynamic Zone & Status Filters**: Filter bays by VIP, Standard, Economy, or status (Free / Occupied) in real time.
 
-### 4. ⏱️ Time-Based Booking & 15-Minute Grace Cancellation
-* **Flexible Scheduling**: Choose starting hour and duration (1 hr, 2 hrs, 3 hrs, 4 hrs, 6 hrs, 8 hrs/full day) with automated calculation of end times and cost.
-* **15-Minute Grace Cancellation Policy**: Drivers can cancel any active booking within a 15-minute grace window for an instant release and full refund.
-* **Non-Destructive Live Countdown**: Second-by-second countdown clock that updates targeted DOM elements without triggering screen re-renders or closing open menus.
+### 5. ⏱️ 7-Day Advance Pre-Booking & Auto-Release Lifecycle Engine
+* **Up to 1-Week (7 Days) Advance Booking**: Drivers can pre-book any parking bay up to 7 days into the future. Offers quick single-tap date pills (`Today`, `Tomorrow`, `+2 Days` ... `+7 Days`) as well as an HTML5 calendar date picker bounded by the 7-day window.
+* **Exact Time Window Selection**: Pick specific, time-based parking intervals (e.g. `09:00 AM — 10:00 AM`, `02:00 PM — 04:00 PM`) or customize exact start and duration with live tariff computation.
+* **Smart Overlap Conflict Prevention**: System prevents double-bookings for the same slot across overlapping windows (`startMs < b.endTimestamp && endMs > b.startTimestamp`) and warns if a driver's vehicle is already reserved for that time.
+* **Automated Allocation Lifecycle & Auto-Release Engine**:
+  * Continuous per-second background monitoring engine automatically evaluates all active reservations.
+  * When a booking window concludes (e.g. 7:00 PM — 8:00 PM ends at 8:00 PM), the booking status automatically shifts to `COMPLETED`, the bay is **instantly returned to FREE (Emerald)**, and an activity notification is dispatched.
+  * Solves the allocation glitch where past reservations previously stayed marked as occupied indefinitely.
+* **Schedule Horizon View**: Switch between real-time `LIVE` bay telemetry and future date schedules to inspect which stalls are free or reserved on upcoming days.
+* **Intelligent 15-Minute Cancellation Policy**:
+  * Drivers can cancel within 15 minutes of reservation creation (immediate grace window), OR anytime up to 15 minutes prior to the scheduled start time for advance pre-bookings.
+  * Releasing a booking immediately frees the slot back to system inventory.
+* **Non-Destructive Live Countdown**: Second-by-second countdown clock that updates targeted DOM elements without triggering full-screen re-renders or closing open menus.
 
-### 5. 🎫 Digital Gate Pass & E-Ticket (ALPR Ready)
+### 6. 🎫 Digital Gate Pass & E-Ticket (ALPR Ready)
 * **Instant Barrier Pass**: Generates an interactive digital boarding pass modal with an SVG QR Code for automated barrier gate scanning.
 * **Automated License Plate Recognition (ALPR)**: Pass metadata maps directly to vehicle license plate, allocated bay code, and paid duration.
+* **Facility Destination & Live Routing**: Includes destination facility metadata and a one-tap "Route" button directly on the access pass.
 * **Print / PDF Receipt Support**: One-click print stylesheet integration (`window.print()`) for physical paper tickets or PDF archiving.
 
-### 6. 🛠️ Administrator Facility Orchestrator
+### 7. 🛠️ Administrator Facility Orchestrator
+* **Location & Map Management**: Admin can update the parking facility name (e.g. `LPU Block 34 Central Parking`), physical address query, and custom embed URLs with live preview.
 * **Dynamic Slot Scaling**: Seamlessly resize parking facility capacity from **4 to 24 slots** (4 bays per row) using a live slider.
 * **Zone Pricing Control**: Set custom hourly rates for VIP, Standard, and Economy zones with instant synchronization across user grids and calculators.
 * **Live Inventory Table**: Comprehensive tabular overview of slot IDs, zone classifications, statuses, hourly rates, parked plates, driver names, and reserved time windows.
